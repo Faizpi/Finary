@@ -607,8 +607,32 @@ function App() {
               </div>
             </form>
 
-            {error && <p className="alert error">{error}</p>}
-            {message && <p className="alert success">{message}</p>}
+            {error && (
+              <div className="alert error">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  className="alert-close"
+                  onClick={() => setError('')}
+                  aria-label="Tutup notifikasi"
+                >
+                  x
+                </button>
+              </div>
+            )}
+            {message && (
+              <div className="alert success">
+                <span>{message}</span>
+                <button
+                  type="button"
+                  className="alert-close"
+                  onClick={() => setMessage('')}
+                  aria-label="Tutup notifikasi"
+                >
+                  x
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="hero-visual panel">
@@ -676,8 +700,32 @@ function App() {
               Mulai dari tab Assessment agar insight lebih personal.
             </p>
           )}
-          {error && <p className="alert error">{error}</p>}
-          {message && <p className="alert success">{message}</p>}
+          {error && (
+            <div className="alert error">
+              <span>{error}</span>
+              <button
+                type="button"
+                className="alert-close"
+                onClick={() => setError('')}
+                aria-label="Tutup notifikasi"
+              >
+                x
+              </button>
+            </div>
+          )}
+          {message && (
+            <div className="alert success">
+              <span>{message}</span>
+              <button
+                type="button"
+                className="alert-close"
+                onClick={() => setMessage('')}
+                aria-label="Tutup notifikasi"
+              >
+                x
+              </button>
+            </div>
+          )}
         </div>
       )}
 

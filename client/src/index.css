@@ -421,6 +421,30 @@ textarea {
   padding: var(--space-xs) var(--space-sm);
   font-weight: 700;
   color: #1f152f;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.alert-close {
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.alert-close:hover {
+  transform: translateY(-1px);
 }
 
 .alert.error {
