@@ -1235,14 +1235,18 @@ function App() {
                 <button className="button" disabled={loading}>Generate Profil</button>
               </form>
 
-              <article className="inset">
+              <article className="inset assessment-preview">
                 <h3>Profil Terbaru</h3>
                 <p>Klasifikasi: <strong>{assessment?.classification || '-'}</strong></p>
                 <p>Goal: {assessment?.financial_goal || '-'}</p>
                 <p>
                   Source inference: <strong>{assessment?.metadata?.source || 'rule-based'}</strong>
                 </p>
-                <img src={storysetAssets.insight} alt="Investment insight illustration from Storyset" />
+                <img
+                  className="assessment-illustration"
+                  src={storysetAssets.insight}
+                  alt="Investment insight illustration from Storyset"
+                />
               </article>
             </div>
           </section>
@@ -1340,9 +1344,13 @@ function App() {
                 <button className="button" disabled={loading}>Publikasikan</button>
               </form>
 
-              <article className="inset">
+              <article className="inset forum-preview">
                 <h3>Komunitas</h3>
-                <img src={storysetAssets.forum} alt="Community illustration from Storyset" />
+                <img
+                  className="forum-illustration"
+                  src={storysetAssets.forum}
+                  alt="Community illustration from Storyset"
+                />
               </article>
             </div>
 

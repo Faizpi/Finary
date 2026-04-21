@@ -505,7 +505,7 @@ textarea {
 
 .alert-close {
   border: 2px solid var(--line);
-  border-radius: 999px;
+  border-radius: 25%;
   width: 24px;
   height: 24px;
   padding: 0;
@@ -525,6 +525,7 @@ textarea {
 
 .alert.error {
   background: var(--danger);
+  margin-top: var(--space-xs);
 }
 
 .alert.success {
@@ -1141,6 +1142,20 @@ textarea {
 
 .hustle-hero-media img {
   width: clamp(210px, 24vw, 300px);
+}
+
+.assessment-preview,
+.forum-preview {
+  align-content: start;
+}
+
+.assessment-illustration,
+.forum-illustration {
+  width: clamp(170px, 30vw, 250px);
+  max-height: 220px;
+  object-fit: contain;
+  justify-self: center;
+  margin-top: var(--space-xs);
 }
 
 .form-grid.compact {
