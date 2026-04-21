@@ -156,6 +156,39 @@ ol {
   grid-template-columns: auto 1fr auto;
 }
 
+.menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 4px 4px 0 var(--line);
+  padding: 9px 8px;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.menu-toggle span {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ink);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.menu-toggle.open span:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.menu-toggle.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.menu-toggle.open span:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
 .sticky {
   position: sticky;
   top: var(--space-sm);
@@ -280,6 +313,10 @@ ol {
   gap: var(--space-lg);
 }
 
+.auth-layout {
+  align-items: stretch;
+}
+
 .panel {
   border: 3px solid var(--line);
   border-radius: 14px;
@@ -358,6 +395,31 @@ ol {
   align-content: center;
   background: var(--bg-pink);
   min-height: 260px;
+}
+
+.auth-visual {
+  align-content: space-between;
+}
+
+.auth-support-list {
+  margin-top: var(--space-xs);
+}
+
+.auth-support-list li {
+  background: #fff8ff;
+}
+
+.auth-form-panel {
+  align-content: center;
+  gap: var(--space-sm);
+}
+
+.auth-form-panel .auth-grid {
+  margin-top: 0;
+}
+
+.auth-form-panel .auth-card-head h2 {
+  font-size: clamp(1.18rem, 1.35vw, 1.46rem);
 }
 
 .hero-visual-frame {
@@ -631,6 +693,68 @@ textarea {
   padding-left: 18px;
   display: grid;
   gap: 4px;
+}
+
+.dashboard-bottom {
+  align-items: start;
+}
+
+.profile-grid {
+  align-items: start;
+}
+
+.profile-card {
+  align-content: start;
+}
+
+.profile-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.profile-meta p {
+  line-height: 1.35;
+}
+
+.profile-recommendations {
+  display: grid;
+  gap: 6px;
+}
+
+.profile-achievement-card {
+  align-content: start;
+}
+
+.profile-achievement-list {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.profile-achievement-item {
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-alt);
+  box-shadow: 3px 3px 0 var(--line);
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: var(--space-xs);
+  align-items: center;
+  padding: var(--space-xs);
+}
+
+.profile-achievement-item .badge-photo-wrap {
+  width: 78px;
+}
+
+.profile-achievement-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-achievement-copy small {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.3;
 }
 
 .achievement-level {
@@ -1267,6 +1391,11 @@ th {
     gap: var(--space-sm);
   }
 
+  .app-header {
+    grid-template-columns: auto auto;
+    align-items: center;
+  }
+
   .auth-header {
     grid-template-columns: 1fr;
   }
@@ -1275,16 +1404,36 @@ th {
     justify-content: flex-start;
   }
 
-  .tab-row {
-    width: 100%;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding-bottom: 4px;
-    scrollbar-width: thin;
+  .menu-toggle {
+    display: grid;
+    justify-self: end;
   }
 
-  .tab {
-    flex: 0 0 auto;
+  .app-header .tab-row {
+    display: none;
+    grid-column: 1 / -1;
+    border: 3px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 4px 4px 0 var(--line);
+    padding: var(--space-xs);
+    overflow: visible;
+    scrollbar-width: auto;
+  }
+
+  .app-header .tab-row.open {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .app-header .tab {
+    width: 100%;
+    text-align: left;
+  }
+
+  .app-header .head-actions {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .chart-board {
@@ -1372,6 +1521,14 @@ th {
   .auth-actions {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .profile-achievement-item {
+    grid-template-columns: 70px 1fr;
+  }
+
+  .profile-achievement-item .badge-photo-wrap {
+    width: 64px;
   }
 
   .form-grid .button,

@@ -13,6 +13,7 @@ import { storysetAssets } from './lib/storyset'
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard' },
+  { id: 'profile', label: 'Profil' },
   { id: 'transactions', label: 'Transaksi' },
   { id: 'assessment', label: 'Assessment' },
   { id: 'hustle', label: 'Side Hustle' },
@@ -85,6 +86,7 @@ function App() {
   const [token, setToken] = useState(savedToken || '')
   const [user, setUser] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [isNavOpen, setIsNavOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [loading, setLoading] = useState(false)
   const [isBootstrapping, setIsBootstrapping] = useState(Boolean(savedToken))
@@ -168,6 +170,21 @@ function App() {
     return Math.max(1, Math.min(maxBadgeLevel, scaled))
   }, [badges])
 
+  const unlockedBadges = useMemo(
+    () => (badges?.badges || []).filter((badge) => badge.unlocked),
+    [badges],
+  )
+
+  const latestUnlockedBadges = useMemo(
+    () => unlockedBadges.slice(-3).reverse(),
+    [unlockedBadges],
+  )
+
+  const userLeaderboardRow = useMemo(
+    () => leaderboard.find((item) => item.name === user?.name),
+    [leaderboard, user],
+  )
+
   const refreshAll = useCallback(async () => {
     const [
       meRes,
@@ -219,6 +236,7 @@ function App() {
     setToken('')
     setUser(null)
     setActiveTab('dashboard')
+    setIsNavOpen(false)
     setDashboard(null)
     setProfile(null)
     setBadges(null)
@@ -233,7 +251,6 @@ function App() {
 
   useEffect(() => {
     if (!token) {
-      setIsBootstrapping(false)
       return
     }
 
@@ -524,27 +541,26 @@ function App() {
           </button>
         </header>
 
-        <main className="hero-layout">
-          <section className="hero-copy panel panel-pop">
-            <p className="kicker">Personal Finance</p>
-            <h1>Kelola uang lebih rapi, tanpa ribet.</h1>
-            <p>
-              Catat, pantau, dan ambil keputusan finansial dengan lebih cepat.
-            </p>
-
-            <ul className="feature-checklist">
+        <main className="hero-layout auth-layout">
+          <section className="hero-visual panel auth-visual">
+            <div className="hero-visual-frame">
+              <img src={storysetAssets.hero} alt="Finance illustration from Storyset" />
+            </div>
+            <ul className="feature-checklist auth-support-list">
               <li>Ringkasan cashflow harian.</li>
               <li>Assessment awal otomatis.</li>
               <li>Rekomendasi side hustle relevan.</li>
             </ul>
+          </section>
 
+          <section className="panel panel-pop auth-form-panel">
             <form className="auth-grid" onSubmit={handleAuthSubmit}>
               <div className="auth-card-head">
-                <h3>{authMode === 'login' ? 'Masuk ke akunmu' : 'Buat akun baru'}</h3>
+                <h2>{authMode === 'login' ? 'Masuk ke Finary' : 'Buat akun baru'}</h2>
                 <p>
                   {authMode === 'login'
-                    ? 'Lanjutkan progress finansialmu.'
-                    : 'Daftar lalu lanjut isi assessment awal.'}
+                    ? 'Masukkan email dan password untuk lanjut.'
+                    : 'Isi data akun untuk mulai daftar.'}
                 </p>
               </div>
 
@@ -634,18 +650,6 @@ function App() {
               </div>
             )}
           </section>
-
-          <section className="hero-visual panel">
-            <div className="hero-visual-frame">
-              <img src={storysetAssets.hero} alt="Finance illustration from Storyset" />
-            </div>
-            <div className="chip-row">
-              <span className="chip">Track</span>
-              <span className="chip">Analyze</span>
-              <span className="chip">Grow</span>
-            </div>
-            <p>Tracking, analisis, dan rekomendasi dalam satu alur.</p>
-          </section>
         </main>
 
         <footer className="credits">
@@ -671,12 +675,26 @@ function App() {
 
       <header className="site-header sticky app-header">
         <div className="brand">Finary</div>
-        <nav className="tab-row">
+        <button
+          type="button"
+          className={`menu-toggle ${isNavOpen ? 'open' : ''}`}
+          aria-expanded={isNavOpen}
+          aria-label="Buka menu navigasi"
+          onClick={() => setIsNavOpen((prev) => !prev)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav className={`tab-row ${isNavOpen ? 'open' : ''}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               className={`tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                setIsNavOpen(false)
+              }}
             >
               {tab.label}
             </button>
@@ -730,146 +748,233 @@ function App() {
       )}
 
       <main className="app-grid">
-        <section className="panel hero-mini">
-          <div>
-            <p className="kicker">Financial cockpit</p>
-            <h2>Ringkasan finansialmu ada di sini.</h2>
-            <p>
-              Lihat transaksi, budget, profil, dan ide side hustle dalam satu layar.
-            </p>
-            <div className="quick-metrics">
-              <span>{transactions.length} transaksi</span>
-              <span>{budgets.length} budget aktif</span>
-              <span>{recommendations.length} ide side hustle</span>
-            </div>
-          </div>
-          <img src={storysetAssets.dashboard} alt="Revenue illustration from Storyset" />
-        </section>
-
         {activeTab === 'dashboard' && (
-          <section className="panel stack">
-            <div className="stats-grid">
-              <article className="stat-card">
-                <p>Income</p>
-                <strong>{currency(dashboard?.summary?.income)}</strong>
-              </article>
-              <article className="stat-card">
-                <p>Expense</p>
-                <strong>{currency(dashboard?.summary?.expense)}</strong>
-              </article>
-              <article className="stat-card">
-                <p>Balance</p>
-                <strong>{currency(dashboard?.summary?.balance)}</strong>
-              </article>
-              <article className="stat-card">
-                <p>Saving Rate</p>
-                <strong>{dashboard?.summary?.saving_rate || 0}%</strong>
-              </article>
-            </div>
-
-            <div className="chart-board">
-              {(dashboard?.monthly_chart || []).map((point) => (
-                <div className="chart-col" key={point.month}>
-                  <div className="bars">
-                    <div className="bar income" style={{ height: `${(point.income / chartMax) * 100}%` }} />
-                    <div className="bar expense" style={{ height: `${(point.expense / chartMax) * 100}%` }} />
-                  </div>
-                  <small>{point.month}</small>
+          <>
+            <section className="panel hero-mini">
+              <div>
+                <p className="kicker">Financial cockpit</p>
+                <h2>Ringkasan finansialmu ada di sini.</h2>
+                <p>
+                  Lihat transaksi, budget, badge, dan progress discipline dalam satu layar.
+                </p>
+                <div className="quick-metrics">
+                  <span>{transactions.length} transaksi</span>
+                  <span>{budgets.length} budget aktif</span>
+                  <span>{recommendations.length} ide side hustle</span>
                 </div>
-              ))}
-            </div>
+              </div>
+              <img src={storysetAssets.dashboard} alt="Revenue illustration from Storyset" />
+            </section>
 
-            <div className="split-grid">
-              <article className="inset dynamic-profile-card">
-                <h3>Dynamic Profile</h3>
-                <div className="dynamic-profile-rows">
+            <section className="panel stack">
+              <div className="stats-grid">
+                <article className="stat-card">
+                  <p>Income</p>
+                  <strong>{currency(dashboard?.summary?.income)}</strong>
+                </article>
+                <article className="stat-card">
+                  <p>Expense</p>
+                  <strong>{currency(dashboard?.summary?.expense)}</strong>
+                </article>
+                <article className="stat-card">
+                  <p>Balance</p>
+                  <strong>{currency(dashboard?.summary?.balance)}</strong>
+                </article>
+                <article className="stat-card">
+                  <p>Saving Rate</p>
+                  <strong>{dashboard?.summary?.saving_rate || 0}%</strong>
+                </article>
+              </div>
+
+              <div className="chart-board">
+                {(dashboard?.monthly_chart || []).map((point) => (
+                  <div className="chart-col" key={point.month}>
+                    <div className="bars">
+                      <div className="bar income" style={{ height: `${(point.income / chartMax) * 100}%` }} />
+                      <div className="bar expense" style={{ height: `${(point.expense / chartMax) * 100}%` }} />
+                    </div>
+                    <small>{point.month}</small>
+                  </div>
+                ))}
+              </div>
+
+              <div className="split-grid duo dashboard-bottom">
+                <article className="inset">
+                  <h3>Badge Progress</h3>
+                  <p>
+                    {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} badges unlocked
+                  </p>
+                  <p className="achievement-level">
+                    Achievement Level: <strong>Lv {achievementLevel}</strong>
+                  </p>
+                  <div className="badge-grid">
+                    {(badges?.badges || []).map((badge) => {
+                      const level = getBadgeLevel(badge.key)
+
+                      return (
+                        <div
+                          key={badge.key}
+                          className={`badge-chip level-${level} ${badge.unlocked ? 'on' : 'locked'}`}
+                        >
+                          <div className="badge-head">
+                            <div className="badge-photo-wrap" aria-hidden="true">
+                              <img
+                                className="badge-photo"
+                                src={getBadgeIcon(badge.key, level)}
+                                data-base-src={getBadgeBaseIcon(badge.key)}
+                                data-fallback-stage="level"
+                                alt={`${badge.name} level ${level}`}
+                                loading="lazy"
+                                onError={(event) => {
+                                  const stage = event.currentTarget.dataset.fallbackStage || 'level'
+                                  if (stage === 'level') {
+                                    event.currentTarget.dataset.fallbackStage = 'base'
+                                    event.currentTarget.src = event.currentTarget.dataset.baseSrc || defaultBadgeIcon
+                                    return
+                                  }
+
+                                  event.currentTarget.onerror = null
+                                  event.currentTarget.src = defaultBadgeIcon
+                                }}
+                              />
+                            </div>
+                            <div className="badge-copy">
+                              <strong>{badge.name}</strong>
+                              <small>{badge.description}</small>
+                            </div>
+                          </div>
+
+                          <div className="badge-level-row" aria-label={`Level ${level} dari ${maxBadgeLevel}`}>
+                            <span className="badge-level-label">Lv {level}</span>
+                            <div className="badge-level-track">
+                              {Array.from({ length: maxBadgeLevel }, (_, index) => (
+                                <span
+                                  key={`${badge.key}-level-${index + 1}`}
+                                  className={`badge-level-dot ${index + 1 <= level ? 'on' : 'off'}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          <span className={`badge-state ${badge.unlocked ? 'on' : 'off'}`}>
+                            {badge.unlocked ? 'Unlocked' : 'Locked'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </article>
+
+                <article className="inset leaderboard-panel">
+                  <h3>Leaderboard</h3>
+                  <ol className="leaderboard">
+                    {leaderboard.map((item) => (
+                      <li key={`${item.name}-${item.rank}`}>
+                        <span>#{item.rank} {item.name}</span>
+                        <strong>{item.discipline_score}</strong>
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === 'profile' && (
+          <section className="panel stack">
+            <div className="split-grid duo profile-grid">
+              <article className="inset profile-card">
+                <h3>Data Diri</h3>
+                <div className="profile-meta">
+                  <p>Nama: <strong>{user.name || '-'}</strong></p>
+                  <p>Email: <strong>{user.email || '-'}</strong></p>
+                  <p>Status akun: <strong>{assessment ? 'Aktif' : 'Belum assessment'}</strong></p>
+                  <p>Bergabung: <strong>{user.created_at ? compactDate(user.created_at) : '-'}</strong></p>
+                </div>
+              </article>
+
+              <article className="inset profile-card">
+                <h3>Status Finansial</h3>
+                <div className="profile-meta">
+                  <p>Klasifikasi: <strong>{assessment?.classification || '-'}</strong></p>
                   <p>Spending habit: <strong>{profile?.spending_habit || '-'}</strong></p>
                   <p>Income pattern: <strong>{profile?.income_pattern || '-'}</strong></p>
                   <p>Saving behavior: <strong>{profile?.saving_behavior || '-'}</strong></p>
+                  <p>Posisi leaderboard: <strong>{userLeaderboardRow ? `#${userLeaderboardRow.rank}` : '-'}</strong></p>
                 </div>
+              </article>
+            </div>
+
+            <div className="split-grid duo profile-grid">
+              <article className="inset dynamic-profile-card">
+                <h3>Insight Profil</h3>
+                <p>
+                  Prediksi saldo bulan depan: <strong>{currency(profile?.prediction?.next_month_balance)}</strong>
+                </p>
                 <ul className="dynamic-profile-warnings">
+                  {(profile?.warnings || []).length === 0 && (
+                    <li>Tidak ada warning. Pertahankan ritme keuanganmu.</li>
+                  )}
                   {(profile?.warnings || []).map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
-              </article>
-
-              <article className="inset">
-                <h3>Badge Progress</h3>
-                <p>
-                  {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} badges unlocked
-                </p>
-                <p className="achievement-level">
-                  Achievement Level: <strong>Lv {achievementLevel}</strong>
-                </p>
-                <div className="badge-grid">
-                  {(badges?.badges || []).map((badge) => {
-                    const level = getBadgeLevel(badge.key)
-
-                    return (
-                      <div
-                        key={badge.key}
-                        className={`badge-chip level-${level} ${badge.unlocked ? 'on' : 'locked'}`}
-                      >
-                        <div className="badge-head">
-                          <div className="badge-photo-wrap" aria-hidden="true">
-                            <img
-                              className="badge-photo"
-                              src={getBadgeIcon(badge.key, level)}
-                              data-base-src={getBadgeBaseIcon(badge.key)}
-                              data-fallback-stage="level"
-                              alt={`${badge.name} level ${level}`}
-                              loading="lazy"
-                              onError={(event) => {
-                                const stage = event.currentTarget.dataset.fallbackStage || 'level'
-                                if (stage === 'level') {
-                                  event.currentTarget.dataset.fallbackStage = 'base'
-                                  event.currentTarget.src = event.currentTarget.dataset.baseSrc || defaultBadgeIcon
-                                  return
-                                }
-
-                                event.currentTarget.onerror = null
-                                event.currentTarget.src = defaultBadgeIcon
-                              }}
-                            />
-                          </div>
-                          <div className="badge-copy">
-                            <strong>{badge.name}</strong>
-                            <small>{badge.description}</small>
-                          </div>
-                        </div>
-
-                        <div className="badge-level-row" aria-label={`Level ${level} dari ${maxBadgeLevel}`}>
-                          <span className="badge-level-label">Lv {level}</span>
-                          <div className="badge-level-track">
-                            {Array.from({ length: maxBadgeLevel }, (_, index) => (
-                              <span
-                                key={`${badge.key}-level-${index + 1}`}
-                                className={`badge-level-dot ${index + 1 <= level ? 'on' : 'off'}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-
-                        <span className={`badge-state ${badge.unlocked ? 'on' : 'off'}`}>
-                          {badge.unlocked ? 'Unlocked' : 'Locked'}
-                        </span>
-                      </div>
-                    )
-                  })}
+                <div className="profile-recommendations">
+                  <h4>Rekomendasi</h4>
+                  <ul className="dynamic-profile-warnings">
+                    {(profile?.recommendations || []).map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
                 </div>
               </article>
 
-              <article className="inset leaderboard-panel">
-                <h3>Leaderboard</h3>
-                <ol className="leaderboard">
-                  {leaderboard.map((item) => (
-                    <li key={`${item.name}-${item.rank}`}>
-                      <span>#{item.rank} {item.name}</span>
-                      <strong>{item.discipline_score}</strong>
-                    </li>
-                  ))}
-                </ol>
+              <article className="inset profile-achievement-card">
+                <h3>Achievement Terbaru</h3>
+                <p>
+                  {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} badges unlocked
+                </p>
+
+                <div className="profile-achievement-list">
+                  {latestUnlockedBadges.length === 0 && (
+                    <p className="helper">Belum ada badge yang terbuka.</p>
+                  )}
+
+                  {latestUnlockedBadges.map((badge) => {
+                    const level = getBadgeLevel(badge.key)
+
+                    return (
+                      <article className="profile-achievement-item" key={`latest-${badge.key}`}>
+                        <div className="badge-photo-wrap" aria-hidden="true">
+                          <img
+                            className="badge-photo"
+                            src={getBadgeIcon(badge.key, level)}
+                            data-base-src={getBadgeBaseIcon(badge.key)}
+                            data-fallback-stage="level"
+                            alt={`${badge.name} level ${level}`}
+                            loading="lazy"
+                            onError={(event) => {
+                              const stage = event.currentTarget.dataset.fallbackStage || 'level'
+                              if (stage === 'level') {
+                                event.currentTarget.dataset.fallbackStage = 'base'
+                                event.currentTarget.src = event.currentTarget.dataset.baseSrc || defaultBadgeIcon
+                                return
+                              }
+
+                              event.currentTarget.onerror = null
+                              event.currentTarget.src = defaultBadgeIcon
+                            }}
+                          />
+                        </div>
+                        <div className="profile-achievement-copy">
+                          <strong>{badge.name}</strong>
+                          <small>{badge.description}</small>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
               </article>
             </div>
           </section>
