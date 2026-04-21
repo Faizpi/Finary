@@ -412,6 +412,7 @@ ol {
 .auth-form-panel {
   align-content: center;
   gap: var(--space-sm);
+  padding: clamp(24px, 2.4vw, 34px);
 }
 
 .auth-form-panel .auth-grid {
@@ -1349,7 +1350,6 @@ th {
     padding: var(--space-md);
   }
 
-  .hero-layout,
   .transactions-grid,
   .split-grid,
   .split-grid.duo,
@@ -1380,6 +1380,10 @@ th {
 @media (max-width: 920px) {
   #root {
     padding: var(--space-sm);
+  }
+
+  .hero-layout {
+    grid-template-columns: 1fr;
   }
 
   .sticky {
@@ -1472,6 +1476,10 @@ th {
 
   .panel {
     padding: 14px;
+  }
+
+  .auth-form-panel {
+    padding: 16px;
   }
 
   .hero-mini {

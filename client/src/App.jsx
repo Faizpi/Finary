@@ -317,7 +317,11 @@ function App() {
         setMessage('Session aktif. Selamat datang di Finary.')
       }
     } catch (err) {
-      setError(err?.response?.data?.message || 'Autentikasi gagal. Coba ulangi.')
+      if (!err?.response) {
+        setError('Tidak bisa terhubung ke API. Jalankan Laravel di http://127.0.0.1:8000.')
+      } else {
+        setError(err?.response?.data?.message || 'Autentikasi gagal. Coba ulangi.')
+      }
     } finally {
       setLoading(false)
     }
@@ -344,8 +348,12 @@ function App() {
       } else {
         setMessage('Masuk dengan akun demo berhasil.')
       }
-    } catch {
-      setError('Akun demo belum siap. Jalankan seed database dahulu.')
+    } catch (err) {
+      if (!err?.response) {
+        setError('Tidak bisa terhubung ke API. Jalankan Laravel di http://127.0.0.1:8000.')
+      } else {
+        setError(err?.response?.data?.message || 'Akun demo belum siap. Jalankan seed database dahulu.')
+      }
     } finally {
       setLoading(false)
     }
