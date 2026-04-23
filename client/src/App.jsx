@@ -806,7 +806,7 @@ function App() {
               </div>
             </section>
 
-            <section className="split-grid duo cashflow-grid">
+            <section className="split-grid cashflow-grid">
               <article className="inset cashflow-card income-card">
                 <p className="cashflow-label">Pemasukan</p>
                 <strong>{currency(dashboard?.summary?.income)}</strong>
@@ -815,9 +815,12 @@ function App() {
               <article className="inset cashflow-card expense-card">
                 <p className="cashflow-label">Pengeluaran</p>
                 <strong>{currency(dashboard?.summary?.expense)}</strong>
-                <small>
-                  Saving rate sekarang <strong>{dashboard?.summary?.saving_rate || 0}%</strong>.
-                </small>
+                <small>Uang keluar selama periode berjalan.</small>
+              </article>
+              <article className="inset cashflow-card saving-card">
+                <p className="cashflow-label">Saving Rate</p>
+                <strong>{dashboard?.summary?.saving_rate || 0}%</strong>
+                <small>Persentase pendapatan yang masih tersimpan.</small>
               </article>
             </section>
 

@@ -602,7 +602,7 @@ textarea {
 
 .cashflow-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-xs);
 }
 
@@ -636,6 +636,10 @@ textarea {
 
 .expense-card {
   background: linear-gradient(180deg, #ffe0ea 0%, #fff0f5 100%);
+}
+
+.saving-card {
+  background: linear-gradient(180deg, #dbf4ff 0%, #eef9ff 100%);
 }
 
 .section-head {
