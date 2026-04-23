@@ -113,7 +113,7 @@ function App() {
 
   const [transactionForm, setTransactionForm] = useState({
     type: 'expense',
-    category: 'Makanan',
+    category: '',
     amount: '',
     transaction_date: today,
     note: '',
@@ -185,6 +185,14 @@ function App() {
     [leaderboard, user],
   )
 
+  const pocketOptions = useMemo(() => {
+    const categories = budgets
+      .map((item) => item.category?.trim())
+      .filter(Boolean)
+
+    return Array.from(new Set(categories)).sort((a, b) => a.localeCompare(b, 'id'))
+  }, [budgets])
+
   const refreshAll = useCallback(async () => {
     const [
       meRes,
@@ -248,6 +256,24 @@ function App() {
     setForumPosts([])
     setIsBootstrapping(false)
   }
+
+  useEffect(() => {
+    if (pocketOptions.length === 0) {
+      setTransactionForm((prev) => (prev.category ? { ...prev, category: '' } : prev))
+      return
+    }
+
+    setTransactionForm((prev) => {
+      if (pocketOptions.includes(prev.category)) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        category: pocketOptions[0],
+      }
+    })
+  }, [pocketOptions])
 
   useEffect(() => {
     if (!token) {
@@ -395,6 +421,12 @@ function App() {
 
   const handleTransactionSubmit = async (event) => {
     event.preventDefault()
+
+    if (pocketOptions.length === 0) {
+      setError('Buat kantong budget dulu sebelum menambah transaksi.')
+      setMessage('')
+      return
+    }
 
     await guardedAction(async () => {
       await transactionApi.create({
@@ -709,9 +741,6 @@ function App() {
           ))}
         </nav>
         <div className="head-actions">
-          <span className={`status-pill ${assessment ? 'ready' : 'pending'}`}>
-            {assessment ? `Mode: ${assessment.classification}` : 'Assessment awal dibutuhkan'}
-          </span>
           <span>Hi, {user.name}</span>
           <button className="button ghost" onClick={handleLogout} disabled={loading}>
             Logout
@@ -758,40 +787,80 @@ function App() {
       <main className="app-grid">
         {activeTab === 'dashboard' && (
           <>
-            <section className="panel hero-mini">
-              <div>
-                <p className="kicker">Financial cockpit</p>
-                <h2>Ringkasan finansialmu ada di sini.</h2>
-                <p>
-                  Lihat transaksi, budget, badge, dan progress discipline dalam satu layar.
+            <section className="panel balance-hero">
+              <div className="balance-copy">
+                <p className="kicker">Saldo Utama</p>
+                <h2>Posisi keuanganmu bulan ini</h2>
+                <p className="balance-amount">{currency(dashboard?.summary?.balance)}</p>
+                <p className="balance-caption">
+                  Ini saldo utama yang jadi acuan sebelum kamu tambah pengeluaran berikutnya.
                 </p>
                 <div className="quick-metrics">
                   <span>{transactions.length} transaksi</span>
-                  <span>{budgets.length} budget aktif</span>
+                  <span>{budgets.length} kantong aktif</span>
                   <span>{recommendations.length} ide side hustle</span>
                 </div>
               </div>
-              <img src={storysetAssets.dashboard} alt="Revenue illustration from Storyset" />
+              <div className="balance-art">
+                <img src={storysetAssets.dashboard} alt="Revenue illustration from Storyset" />
+              </div>
+            </section>
+
+            <section className="split-grid duo cashflow-grid">
+              <article className="inset cashflow-card income-card">
+                <p className="cashflow-label">Pemasukan</p>
+                <strong>{currency(dashboard?.summary?.income)}</strong>
+                <small>Uang masuk selama periode berjalan.</small>
+              </article>
+              <article className="inset cashflow-card expense-card">
+                <p className="cashflow-label">Pengeluaran</p>
+                <strong>{currency(dashboard?.summary?.expense)}</strong>
+                <small>
+                  Saving rate sekarang <strong>{dashboard?.summary?.saving_rate || 0}%</strong>.
+                </small>
+              </article>
             </section>
 
             <section className="panel stack">
-              <div className="stats-grid">
-                <article className="stat-card">
-                  <p>Income</p>
-                  <strong>{currency(dashboard?.summary?.income)}</strong>
-                </article>
-                <article className="stat-card">
-                  <p>Expense</p>
-                  <strong>{currency(dashboard?.summary?.expense)}</strong>
-                </article>
-                <article className="stat-card">
-                  <p>Balance</p>
-                  <strong>{currency(dashboard?.summary?.balance)}</strong>
-                </article>
-                <article className="stat-card">
-                  <p>Saving Rate</p>
-                  <strong>{dashboard?.summary?.saving_rate || 0}%</strong>
-                </article>
+              <div className="section-head">
+                <h3>Kantong Aktif</h3>
+                <p className="helper">{budgets.length} kantong terdaftar</p>
+              </div>
+
+              <div className="pocket-grid">
+                {budgets.length === 0 && (
+                  <article className="pocket-card empty">
+                    <strong>Belum ada kantong.</strong>
+                    <p>Buka tab Transaksi, lalu tambah kantong budget dulu.</p>
+                  </article>
+                )}
+
+                {budgets.map((item) => (
+                  <article
+                    key={item.id}
+                    className={`pocket-card ${item.is_overbudget ? 'is-over' : ''}`}
+                  >
+                    <div className="pocket-head">
+                      <strong>{item.category}</strong>
+                      <span>{item.period || currentMonth}</span>
+                    </div>
+                    <p>{currency(item.spent)} / {currency(item.monthly_limit)}</p>
+                    <div className="progress-wrap">
+                      <div
+                        className={`progress ${item.is_overbudget ? 'danger' : ''}`}
+                        style={{ width: `${Math.min(item.progress_percent || 0, 100)}%` }}
+                      />
+                    </div>
+                    <small>{Math.round(item.progress_percent || 0)}% terpakai</small>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel stack">
+              <div className="section-head">
+                <h3>Tren Cashflow Bulanan</h3>
+                <p className="helper">Perbandingan pemasukan vs pengeluaran per bulan</p>
               </div>
 
               <div className="chart-board">
@@ -805,7 +874,9 @@ function App() {
                   </div>
                 ))}
               </div>
+            </section>
 
+            <section className="panel stack">
               <div className="split-grid duo dashboard-bottom">
                 <article className="inset">
                   <h3>Badge Progress</h3>
@@ -904,8 +975,12 @@ function App() {
 
               <article className="inset profile-card">
                 <h3>Status Finansial</h3>
+                <div className="profile-mode-row">
+                  <span className={`status-pill ${assessment ? 'ready' : 'pending'}`}>
+                    {assessment ? `Mode: ${assessment.classification}` : 'Assessment awal dibutuhkan'}
+                  </span>
+                </div>
                 <div className="profile-meta">
-                  <p>Klasifikasi: <strong>{assessment?.classification || '-'}</strong></p>
                   <p>Spending habit: <strong>{profile?.spending_habit || '-'}</strong></p>
                   <p>Income pattern: <strong>{profile?.income_pattern || '-'}</strong></p>
                   <p>Saving behavior: <strong>{profile?.saving_behavior || '-'}</strong></p>
@@ -1004,14 +1079,24 @@ function App() {
                   </select>
                 </label>
                 <label>
-                  Kategori
-                  <input
-                    list="category-list"
+                  Kantong
+                  <select
                     value={transactionForm.category}
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, category: e.target.value }))}
+                    disabled={pocketOptions.length === 0}
                     required
-                  />
+                  >
+                    {pocketOptions.length === 0 && (
+                      <option value="">Belum ada kantong</option>
+                    )}
+                    {pocketOptions.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
                 </label>
+                {pocketOptions.length === 0 && (
+                  <p className="helper">Tambah kantong budget dulu agar transaksi bisa dipilih dari dropdown.</p>
+                )}
                 <label>
                   Nominal
                   <input
@@ -1040,7 +1125,7 @@ function App() {
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, note: e.target.value }))}
                   />
                 </label>
-                <button className="button" disabled={loading}>Simpan Transaksi</button>
+                <button className="button" disabled={loading || pocketOptions.length === 0}>Simpan Transaksi</button>
               </form>
 
               <div className="inset">
@@ -1058,6 +1143,7 @@ function App() {
                   <label>
                     Periode (YYYY-MM)
                     <input
+                      type="month"
                       value={budgetForm.period}
                       onChange={(e) => setBudgetForm((prev) => ({ ...prev, period: e.target.value }))}
                       required

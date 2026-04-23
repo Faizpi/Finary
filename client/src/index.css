@@ -541,28 +541,40 @@ textarea {
   gap: var(--space-md);
 }
 
-.hero-mini {
+.balance-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
   gap: var(--space-lg);
-  align-items: center;
-  background: var(--surface-alt);
+  align-items: stretch;
+  background: linear-gradient(135deg, #f8f4ff 0%, #ffffff 44%, #dff4ff 100%);
   padding: clamp(16px, 1.75vw, 26px);
 }
 
-.hero-mini > div {
+.balance-copy {
   display: grid;
   gap: var(--space-xs);
   align-content: start;
 }
 
-.hero-mini p {
-  max-width: 60ch;
+.balance-amount {
+  font-family: "Sora", sans-serif;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  line-height: 1;
+  color: #161125;
+  letter-spacing: 0.4px;
 }
 
-.hero-mini img {
+.balance-caption {
+  max-width: 58ch;
+}
+
+.balance-art {
+  display: grid;
+  place-items: center;
+}
+
+.balance-art img {
   width: clamp(210px, 24vw, 300px);
-  justify-self: end;
 }
 
 .quick-metrics {
@@ -588,26 +600,107 @@ textarea {
   gap: var(--space-sm);
 }
 
-.stats-grid {
+.cashflow-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-xs);
 }
 
-.stat-card {
-  border: 3px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-alt);
-  padding: var(--space-sm);
-  box-shadow: 5px 5px 0 var(--line);
-  animation: pop-in 0.35s ease;
+.cashflow-card {
+  align-content: start;
+  gap: 9px;
 }
 
-.stat-card strong {
+.cashflow-label {
+  font-family: "Sora", sans-serif;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5f5774;
+}
+
+.cashflow-card strong {
   display: block;
-  margin-top: var(--space-2xs);
-  font-size: 1.18rem;
-  color: var(--ink);
+  font-size: clamp(1.35rem, 2.2vw, 2.05rem);
+  color: #1f1834;
+}
+
+.cashflow-card small {
+  color: #4f4766;
+  font-weight: 600;
+}
+
+.income-card {
+  background: linear-gradient(180deg, #e6ffd0 0%, #f6ffe8 100%);
+}
+
+.expense-card {
+  background: linear-gradient(180deg, #ffe0ea 0%, #fff0f5 100%);
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.pocket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-xs);
+}
+
+.pocket-card {
+  border: 3px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f4ff 100%);
+  padding: var(--space-sm);
+  display: grid;
+  gap: 8px;
+  box-shadow: 4px 4px 0 var(--line);
+}
+
+.pocket-card.is-over {
+  background: linear-gradient(180deg, #ffe5ec 0%, #fff5f8 100%);
+}
+
+.pocket-card.empty {
+  background: #fffceb;
+  min-height: 140px;
+  align-content: center;
+}
+
+.pocket-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.pocket-head strong {
+  color: #1f1834;
+}
+
+.pocket-head span {
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pocket-card p {
+  color: #3d3655;
+  font-weight: 600;
+}
+
+.pocket-card small {
+  font-size: 0.78rem;
+  color: #5d5575;
+  font-weight: 700;
 }
 
 .chart-board {
@@ -707,6 +800,11 @@ textarea {
 
 .profile-card {
   align-content: start;
+}
+
+.profile-mode-row {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .profile-meta {
@@ -1369,11 +1467,11 @@ th {
   .split-grid,
   .split-grid.duo,
   .recommend-grid,
-  .stats-grid {
+  .cashflow-grid {
     grid-template-columns: 1fr;
   }
 
-  .hero-mini {
+  .balance-hero {
     grid-template-columns: 1fr;
     gap: var(--space-sm);
   }
@@ -1387,8 +1485,12 @@ th {
     justify-items: start;
   }
 
-  .hero-mini img {
-    justify-self: start;
+  .balance-art {
+    justify-items: start;
+  }
+
+  .balance-art img {
+    width: clamp(180px, 56vw, 260px);
   }
 }
 
@@ -1497,14 +1599,18 @@ th {
     padding: 16px;
   }
 
-  .hero-mini {
+  .balance-hero {
     padding: 16px;
     gap: 12px;
   }
 
-  .hero-mini img {
+  .balance-amount {
+    font-size: clamp(1.85rem, 8.8vw, 2.45rem);
+  }
+
+  .balance-art img {
     margin-top: 4px;
-    width: clamp(180px, 58vw, 240px);
+    width: clamp(170px, 66vw, 228px);
   }
 
   .head-actions {
