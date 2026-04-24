@@ -74,7 +74,3 @@ Jika model sudah siap, lihat:
 
 - server/docs/ML_INTEGRATION.md
 
-## 5) Storyset Assets
-
-Frontend menggunakan ilustrasi dari Storyset (Freepik) via URL SVG.
-Tetap perhatikan atribusi lisensi sesuai ketentuan Storyset/Freepik.
