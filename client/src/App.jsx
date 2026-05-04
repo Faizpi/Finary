@@ -12,15 +12,6 @@ import api, {
 } from './lib/api'
 import { compactDate, currency } from './lib/format'
 
-const tabs = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'profile', label: 'Profil' },
-  { id: 'transactions', label: 'Transaksi' },
-  { id: 'assessment', label: 'Assessment' },
-  { id: 'hustle', label: 'Side Hustle' },
-  { id: 'forum', label: 'Forum' },
-]
-
 const categoryOptions = [
   'Makanan',
   'Transport',
@@ -82,6 +73,8 @@ const badgeLevelByKey = {
 const today = new Date().toISOString().slice(0, 10)
 const currentMonth = new Date().toISOString().slice(0, 7)
 
+const pieColors = ['#ff9ba8', '#9ce9ff', '#b698ff', '#d7ff35', '#ffd8f0', '#a9f2c9', '#ffc48b']
+
 const splitCsv = (value) =>
   value
     .split(',')
@@ -104,6 +97,7 @@ const getBadgeLevel = (key) => badgeLevelByKey[key] || 1
 function App() {
   const savedToken = localStorage.getItem('finary_token')
 
+  const [language, setLanguage] = useState(() => localStorage.getItem('finary_lang') || 'id')
   const [token, setToken] = useState(savedToken || '')
   const [user, setUser] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -113,25 +107,16 @@ function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(Boolean(savedToken))
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [isBalanceVisible, setIsBalanceVisible] = useState(false)
+  const [profilePhoto, setProfilePhoto] = useState(() => localStorage.getItem('finary_profile_photo') || '')
 
   // Onboarding: show assessment modal right after register
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   // ML state
   const [mlClassifyResult, setMlClassifyResult] = useState(null)
-  const [mlPredictResult, setMlPredictResult] = useState(null)
   const [mlSideHustleResult, setMlSideHustleResult] = useState(null)
   const [mlLoading, setMlLoading] = useState(false)
-  const [predictLoading, setPredictLoading] = useState(false)
-
-  const [predictForm, setPredictForm] = useState({
-    income: '',
-    expense: '',
-    savings: '',
-    target_tabungan: '',
-    loan_payment: '0',
-    emergency_fund: '',
-  })
 
   const [dashboard, setDashboard] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -159,9 +144,8 @@ function App() {
     note: '',
   })
 
-  // Saldo hutang dan dana darurat (from assessment)
-  const [hutangBalance, setHutangBalance] = useState(0)
-  const [emergencyBalance, setEmergencyBalance] = useState(0)
+  const [loanUpdate, setLoanUpdate] = useState('')
+  const [emergencyUpdate, setEmergencyUpdate] = useState('')
 
   const [budgetForm, setBudgetForm] = useState({
     category: 'Makanan',
@@ -191,14 +175,67 @@ function App() {
   })
   const [forumReplyForms, setForumReplyForms] = useState({})
 
-  const chartMax = useMemo(() => {
-    const points = dashboard?.monthly_chart || []
-    const max = points.reduce((acc, item) => {
-      return Math.max(acc, item.income || 0, item.expense || 0)
-    }, 1)
+  const t = useCallback((idText, enText) => (language === 'en' ? enText : idText), [language])
 
-    return max <= 0 ? 1 : max
-  }, [dashboard])
+  const tabs = useMemo(
+    () => [
+      { id: 'dashboard', label: t('Dashboard', 'Dashboard') },
+      { id: 'profile', label: t('Profil', 'Profile') },
+      { id: 'transactions', label: t('Transaksi', 'Transactions') },
+      { id: 'assessment', label: t('Assessment', 'Assessment') },
+      { id: 'hustle', label: t('Side Hustle', 'Side Hustle') },
+      { id: 'forum', label: t('Forum', 'Forum') },
+    ],
+    [t],
+  )
+
+  const monthlyIncome = Number(dashboard?.summary?.income || 0)
+  const monthlyExpense = Number(dashboard?.summary?.expense || 0)
+  const monthlyBalance = Number(dashboard?.summary?.balance || 0)
+  const monthlySavings = Number(assessment?.actual_savings || 0)
+  const savingsTarget = Number(assessment?.budget_goal || 0)
+  const loanPayment = Number(assessment?.loan_payment || 0)
+  const emergencyFund = Number(assessment?.emergency_fund || 0)
+  const monthMax = Math.max(monthlyIncome, monthlyExpense, 1)
+
+  const expenseSlices = useMemo(() => {
+    const items = budgets
+      .map((item, index) => ({
+        label: item.category,
+        value: Number(item.spent) || 0,
+        color: pieColors[index % pieColors.length],
+      }))
+      .filter((item) => item.value > 0)
+
+    const total = items.reduce((sum, item) => sum + item.value, 0)
+    let running = 0
+    const slices = items.map((item) => {
+      const percent = total > 0 ? (item.value / total) * 100 : 0
+      const start = running
+      running += percent
+
+      return {
+        ...item,
+        percent,
+        start,
+        end: running,
+      }
+    })
+
+    return { slices, total }
+  }, [budgets])
+
+  const pieBackground = useMemo(() => {
+    if (expenseSlices.total <= 0) {
+      return 'conic-gradient(#f0eef6 0% 100%)'
+    }
+
+    const gradient = expenseSlices.slices
+      .map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`)
+      .join(', ')
+
+    return `conic-gradient(${gradient})`
+  }, [expenseSlices])
 
   const achievementLevel = useMemo(() => {
     const unlocked = badges?.summary?.unlocked_count || 0
@@ -225,6 +262,46 @@ function App() {
   const userLeaderboardRow = useMemo(
     () => leaderboard.find((item) => item.name === user?.name),
     [leaderboard, user],
+  )
+
+  const userInitials = useMemo(() => {
+    const rawName = user?.name || ''
+    const parts = rawName.trim().split(' ').filter(Boolean)
+    if (parts.length === 0) {
+      return '??'
+    }
+
+    return parts.slice(0, 2).map((part) => part[0].toUpperCase()).join('')
+  }, [user])
+
+  const metricSlides = useMemo(
+    () => [
+      {
+        key: 'loan',
+        label: t('Cicilan Hutang', 'Loan Installment'),
+        value: currency(loanPayment),
+        helper: t('Perkiraan cicilan bulanan.', 'Estimated monthly installment.'),
+      },
+      {
+        key: 'emergency',
+        label: t('Dana Darurat', 'Emergency Fund'),
+        value: currency(emergencyFund),
+        helper: t('Dana cadangan yang tersedia.', 'Reserve funds available now.'),
+      },
+      {
+        key: 'savings',
+        label: t('Tabungan Bulan Ini', 'Savings This Month'),
+        value: currency(monthlySavings),
+        helper: t('Mengacu pada asesmen terakhir.', 'Based on your latest assessment.'),
+      },
+      {
+        key: 'target',
+        label: t('Target Tabungan', 'Savings Target'),
+        value: currency(savingsTarget),
+        helper: t('Target tabungan yang ingin dicapai.', 'Savings goal you want to reach.'),
+      },
+    ],
+    [t, loanPayment, emergencyFund, monthlySavings, savingsTarget],
   )
 
   const pocketOptions = useMemo(() => {
@@ -296,9 +373,9 @@ function App() {
     setAssessment(null)
     setRecommendations([])
     setForumPosts([])
-    setMlPredictResult(null)
-    setHutangBalance(0)
-    setEmergencyBalance(0)
+    setLoanUpdate('')
+    setEmergencyUpdate('')
+    setIsBalanceVisible(false)
     setIsBootstrapping(false)
   }
 
@@ -320,48 +397,27 @@ function App() {
     })
   }, [pocketOptions])
 
-  // Auto-populate predictForm & auto-run /predict from dashboard + assessment
   useEffect(() => {
-    if (!dashboard && !assessment) return
+    localStorage.setItem('finary_lang', language)
+  }, [language])
 
-    const income         = dashboard?.summary?.income     || assessment?.monthly_income  || 0
-    const expense        = dashboard?.summary?.expense    || assessment?.monthly_expense || 0
-    const savings        = assessment?.actual_savings     || 0
-    const target         = assessment?.budget_goal        || 0
-    const loan           = assessment?.loan_payment       || 0
-    const emergency      = assessment?.emergency_fund     || 0
-
-    // Sync balance cards
-    setHutangBalance(loan)
-    setEmergencyBalance(emergency)
-
-    const next = {
-      income:          String(income),
-      expense:         String(expense),
-      savings:         String(savings),
-      target_tabungan: String(target),
-      loan_payment:    String(loan),
-      emergency_fund:  String(emergency),
+  useEffect(() => {
+    if (profilePhoto) {
+      localStorage.setItem('finary_profile_photo', profilePhoto)
+      return
     }
-    setPredictForm(next)
 
-    // Auto-call /predict
-    if (income > 0) {
-      setPredictLoading(true)
-      mlApiClient
-        .predict({
-          income:          Number(income),
-          expense:         Number(expense),
-          savings:         Number(savings),
-          target_tabungan: Number(target),
-          loan_payment:    Number(loan),
-          emergency_fund:  Number(emergency),
-        })
-        .then((res) => setMlPredictResult(res.data))
-        .catch(() => {})
-        .finally(() => setPredictLoading(false))
+    localStorage.removeItem('finary_profile_photo')
+  }, [profilePhoto])
+
+  useEffect(() => {
+    if (!assessment) {
+      return
     }
-  }, [dashboard, assessment])
+
+    setLoanUpdate((prev) => (prev ? prev : String(assessment.loan_payment ?? '')))
+    setEmergencyUpdate((prev) => (prev ? prev : String(assessment.emergency_fund ?? '')))
+  }, [assessment])
 
   useEffect(() => {
     if (!token) {
@@ -513,6 +569,73 @@ function App() {
     }
   }
 
+  const handleProfilePhotoChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      if (result) {
+        setProfilePhoto(result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const buildAssessmentPayload = (overrides = {}) => {
+    if (!assessment) {
+      return null
+    }
+
+    const loanValue = overrides.loan_payment ?? assessment.loan_payment ?? 0
+    const emergencyValue = overrides.emergency_fund ?? assessment.emergency_fund ?? 0
+
+    return {
+      monthly_income: Number(assessment.monthly_income || 0),
+      monthly_expense: Number(assessment.monthly_expense || 0),
+      actual_savings: Number(assessment.actual_savings || 0),
+      budget_goal: Number(assessment.budget_goal || 0),
+      emergency_fund: Number(emergencyValue || 0),
+      loan_payment: Number(loanValue || 0),
+      classification: assessment.classification || 'unknown',
+    }
+  }
+
+  const handleLoanUpdateSubmit = async (event) => {
+    event.preventDefault()
+    const payload = buildAssessmentPayload({ loan_payment: Number(loanUpdate || 0) })
+
+    if (!payload) {
+      setError(t('Lengkapi assessment dulu sebelum memperbarui cicilan.', 'Complete the assessment before updating loan installments.'))
+      setMessage('')
+      return
+    }
+
+    await guardedAction(async () => {
+      await assessmentApi.create(payload)
+      setLoanUpdate('')
+    }, t('Cicilan hutang diperbarui.', 'Loan installment updated.'))
+  }
+
+  const handleEmergencyUpdateSubmit = async (event) => {
+    event.preventDefault()
+    const payload = buildAssessmentPayload({ emergency_fund: Number(emergencyUpdate || 0) })
+
+    if (!payload) {
+      setError(t('Lengkapi assessment dulu sebelum memperbarui dana darurat.', 'Complete the assessment before updating emergency funds.'))
+      setMessage('')
+      return
+    }
+
+    await guardedAction(async () => {
+      await assessmentApi.create(payload)
+      setEmergencyUpdate('')
+    }, t('Dana darurat diperbarui.', 'Emergency fund updated.'))
+  }
+
   const handleTransactionSubmit = async (event) => {
     event.preventDefault()
 
@@ -603,30 +726,6 @@ function App() {
     }
   }
 
-  const handlePredictSubmit = async (event) => {
-    event.preventDefault()
-    setPredictLoading(true)
-    setError('')
-    setMessage('')
-    try {
-      const payload = {
-        income:          Number(predictForm.income),
-        expense:         Number(predictForm.expense),
-        savings:         Number(predictForm.savings),
-        target_tabungan: Number(predictForm.target_tabungan),
-        loan_payment:    Number(predictForm.loan_payment),
-        emergency_fund:  Number(predictForm.emergency_fund),
-      }
-      const res = await mlApiClient.predict(payload)
-      setMlPredictResult(res.data)
-      setMessage('Prediksi saldo bulan depan berhasil dimuat dari AI.')
-    } catch (err) {
-      setError(err?.message || 'Gagal menjalankan prediksi AI.')
-    } finally {
-      setPredictLoading(false)
-    }
-  }
-
   const handleRecommendationSubmit = async (event) => {
     event.preventDefault()
     setMlLoading(true)
@@ -713,12 +812,22 @@ function App() {
     }
   }
 
+  const formatTransactionType = useCallback((type) => {
+    if (type === 'income') {
+      return t('Pemasukan', 'Income')
+    }
+    if (type === 'expense') {
+      return t('Pengeluaran', 'Expense')
+    }
+    return type
+  }, [t])
+
   if (token && isBootstrapping) {
     return (
       <div className="page">
         <section className="panel loading-panel">
-          <p className="kicker">Menyiapkan akun</p>
-          <h2>Sedang menyiapkan data akunmu.</h2>
+          <p className="kicker">{t('Menyiapkan akun', 'Preparing account')}</p>
+          <h2>{t('Sedang menyiapkan data akunmu.', 'Setting up your account data.')}</h2>
           <div className="loading-track">
             <span className="loading-bar" />
           </div>
@@ -733,7 +842,7 @@ function App() {
         <header className="site-header auth-header">
           <div className="brand">Finary</div>
           <button className="button ghost" onClick={handleDemoLogin} disabled={loading}>
-            {loading ? 'Memuat...' : 'Masuk Demo'}
+            {loading ? t('Memuat...', 'Loading...') : t('Masuk Demo', 'Demo Login')}
           </button>
         </header>
 
@@ -742,29 +851,29 @@ function App() {
             <div className="auth-brand-block auth-brand-image">
               <img src={finaryImg} alt="Finary" className="auth-finary-img" />
               <h1>Finary</h1>
-              <p>Kelola keuanganmu dengan cerdas — didukung AI.</p>
+              <p>{t('Kelola keuanganmu dengan cerdas — didukung AI.', 'Manage your finances smartly — powered by AI.')}</p>
             </div>
 
             <div className="panel auth-form-panel">
               <form className="auth-grid" onSubmit={handleAuthSubmit}>
                 <div className="auth-card-head">
-                  <h2>{authMode === 'login' ? 'Masuk ke Finary' : 'Buat akun baru'}</h2>
-                  <p>{authMode === 'login' ? 'Masukkan email dan password.' : 'Isi data untuk mulai daftar.'}</p>
+                  <h2>{authMode === 'login' ? t('Masuk ke Finary', 'Sign in to Finary') : t('Buat akun baru', 'Create a new account')}</h2>
+                  <p>{authMode === 'login' ? t('Masukkan email dan password.', 'Enter your email and password.') : t('Isi data untuk mulai daftar.', 'Fill in the details to get started.')}</p>
                 </div>
 
                 {authMode === 'register' && (
-                  <label>Nama
+                  <label>{t('Nama', 'Name')}
                     <input value={authForm.name} onChange={(e) => setAuthForm((p) => ({ ...p, name: e.target.value }))} required />
                   </label>
                 )}
-                <label>Email
+                <label>{t('Email', 'Email')}
                   <input type="email" value={authForm.email} onChange={(e) => setAuthForm((p) => ({ ...p, email: e.target.value }))} required />
                 </label>
-                <label>Password
+                <label>{t('Password', 'Password')}
                   <input type="password" value={authForm.password} onChange={(e) => setAuthForm((p) => ({ ...p, password: e.target.value }))} required />
                 </label>
                 {authMode === 'register' && (
-                  <label>Konfirmasi Password
+                  <label>{t('Konfirmasi Password', 'Confirm Password')}
                     <input type="password" value={authForm.password_confirmation} onChange={(e) => setAuthForm((p) => ({ ...p, password_confirmation: e.target.value }))} required />
                   </label>
                 )}
@@ -774,10 +883,10 @@ function App() {
 
                 <div className="auth-actions">
                   <button className="button" disabled={loading}>
-                    {loading ? 'Memuat...' : authMode === 'login' ? 'Login' : 'Register'}
+                    {loading ? t('Memuat...', 'Loading...') : authMode === 'login' ? t('Login', 'Login') : t('Register', 'Register')}
                   </button>
                   <button type="button" className="button ghost" onClick={() => setAuthMode((p) => (p === 'login' ? 'register' : 'login'))}>
-                    {authMode === 'login' ? 'Buat akun baru' : 'Sudah punya akun? Login'}
+                    {authMode === 'login' ? t('Buat akun baru', 'Create a new account') : t('Sudah punya akun? Login', 'Already have an account? Login')}
                   </button>
                 </div>
               </form>
@@ -796,49 +905,49 @@ function App() {
       <div className="page auth-page">
         <header className="site-header auth-header">
           <div className="brand">Finary</div>
-          <span className="onboarding-step">Langkah 1 dari 1 — Asesmen Awal</span>
+          <span className="onboarding-step">{t('Langkah 1 dari 1 — Asesmen Awal', 'Step 1 of 1 — Initial Assessment')}</span>
         </header>
         <main className="auth-center">
           <div className="auth-box onboarding-box">
             <div className="auth-brand-block auth-brand-image">
               <img src={finaryImg} alt="Finary" className="auth-finary-img" />
-              <h1>Asesmen Finansial</h1>
-              <p>Isi data keuanganmu agar AI bisa mengklasifikasikan kondisi finansialmu secara akurat.</p>
+              <h1>{t('Asesmen Finansial', 'Financial Assessment')}</h1>
+              <p>{t('Isi data keuanganmu agar AI bisa mengklasifikasikan kondisi finansialmu secara akurat.', 'Fill in your financial data so AI can classify your condition accurately.')}</p>
             </div>
             <div className="panel auth-form-panel">
               <form className="auth-grid" onSubmit={handleAssessmentSubmit}>
                 <div className="auth-card-head">
-                  <h2>Data Keuangan Kamu</h2>
-                  <p>6 field — sesuai dengan input model AI /classify &amp; /predict.</p>
+                  <h2>{t('Data Keuangan Kamu', 'Your Financial Data')}</h2>
+                  <p>{t('6 field — sesuai dengan input model AI /classify.', '6 fields — aligned with the AI model inputs /classify.')}</p>
                 </div>
-                <label>Pendapatan Bulanan (IDR)
+                <label>{t('Pendapatan Bulanan (IDR)', 'Monthly Income (IDR)')}
                   <input type="number" min="1" value={assessmentForm.monthly_income}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_income: e.target.value }))} required />
                 </label>
-                <label>Total Pengeluaran Bulanan (IDR)
+                <label>{t('Total Pengeluaran Bulanan (IDR)', 'Total Monthly Expenses (IDR)')}
                   <input type="number" min="0" value={assessmentForm.monthly_expense}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_expense: e.target.value }))} required />
                 </label>
-                <label>Tabungan Aktual Bulan Ini (IDR)
+                <label>{t('Tabungan Aktual Bulan Ini (IDR)', 'Actual Savings This Month (IDR)')}
                   <input type="number" min="0" value={assessmentForm.actual_savings}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, actual_savings: e.target.value }))} required />
                 </label>
-                <label>Target Tabungan / Budget Goal (IDR)
+                <label>{t('Target Tabungan / Budget Goal (IDR)', 'Savings Target / Budget Goal (IDR)')}
                   <input type="number" min="0" value={assessmentForm.budget_goal}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, budget_goal: e.target.value }))} required />
                 </label>
-                <label>Cicilan Hutang / Bulan (IDR)
+                <label>{t('Cicilan Hutang / Bulan (IDR)', 'Loan Installment / Month (IDR)')}
                   <input type="number" min="0" value={assessmentForm.loan_payment}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, loan_payment: e.target.value }))} required />
                 </label>
-                <label>Dana Darurat saat ini (IDR)
+                <label>{t('Dana Darurat saat ini (IDR)', 'Emergency Fund (IDR)')}
                   <input type="number" min="0" value={assessmentForm.emergency_fund}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, emergency_fund: e.target.value }))} required />
                 </label>
                 {error && <div className="alert error"><span>{error}</span><button type="button" className="alert-close" onClick={() => setError('')}>x</button></div>}
                 <div className="auth-actions">
                   <button className="button" disabled={loading}>
-                    {loading ? '🤖 Menganalisis AI...' : '🤖 Analisis & Mulai'}
+                    {loading ? t('🤖 Menganalisis AI...', '🤖 Analyzing...') : t('🤖 Analisis & Mulai', '🤖 Analyze & Start')}
                   </button>
                 </div>
               </form>
@@ -870,7 +979,7 @@ function App() {
           type="button"
           className={`menu-toggle ${isNavOpen ? 'open' : ''}`}
           aria-expanded={isNavOpen}
-          aria-label="Buka menu navigasi"
+          aria-label={t('Buka menu navigasi', 'Open navigation menu')}
           onClick={() => setIsNavOpen((prev) => !prev)}
         >
           <span />
@@ -892,9 +1001,17 @@ function App() {
           ))}
         </nav>
         <div className="head-actions">
-          <span>Hi, {user.name}</span>
+          <span>{t('Halo', 'Hi')}, {user.name}</span>
+          <button
+            type="button"
+            className="button ghost tiny"
+            onClick={() => setLanguage((prev) => (prev === 'id' ? 'en' : 'id'))}
+            aria-label={t('Ganti bahasa', 'Switch language')}
+          >
+            {language === 'id' ? 'EN' : 'ID'}
+          </button>
           <button className="button ghost" onClick={handleLogout} disabled={loading}>
-            Logout
+            {t('Logout', 'Logout')}
           </button>
         </div>
       </header>
@@ -903,7 +1020,7 @@ function App() {
         <div className="notice-wrap">
           {!assessment && (
             <p className="alert onboarding">
-              Mulai dari tab Assessment agar insight lebih personal.
+              {t('Mulai dari tab Assessment agar insight lebih personal.', 'Start with the Assessment tab for personalized insights.')}
             </p>
           )}
           {error && (
@@ -913,7 +1030,7 @@ function App() {
                 type="button"
                 className="alert-close"
                 onClick={() => setError('')}
-                aria-label="Tutup notifikasi"
+                aria-label={t('Tutup notifikasi', 'Close notification')}
               >
                 x
               </button>
@@ -926,7 +1043,7 @@ function App() {
                 type="button"
                 className="alert-close"
                 onClick={() => setMessage('')}
-                aria-label="Tutup notifikasi"
+                aria-label={t('Tutup notifikasi', 'Close notification')}
               >
                 x
               </button>
@@ -940,115 +1057,86 @@ function App() {
           <>
             <section className="panel balance-hero">
               <div className="balance-copy">
-                <p className="kicker">Saldo Utama</p>
-                <h2>Posisi keuanganmu bulan ini</h2>
-                <p className="balance-amount">{currency(dashboard?.summary?.balance)}</p>
-                <p className="balance-caption">Saldo acuan sebelum pengeluaran berikutnya.</p>
-                {assessment && (
-                  <div className={`ml-classify-badge ml-${assessment.classification}`} style={{marginTop: '12px'}}>
-                    {(assessment.classification || 'N/A').toUpperCase()}
-                  </div>
-                )}
+                <p className="kicker">{t('Saldo Utama', 'Main Balance')}</p>
+                <h2>{t('Posisi keuanganmu bulan ini', 'Your financial position this month')}</h2>
+                <div className="balance-row">
+                  <p className={`balance-amount ${isBalanceVisible ? '' : 'is-hidden'}`}>
+                    {isBalanceVisible ? currency(monthlyBalance) : '******'}
+                  </p>
+                  <button
+                    type="button"
+                    className="button ghost tiny"
+                    onClick={() => setIsBalanceVisible((prev) => !prev)}
+                  >
+                    {isBalanceVisible ? t('Sembunyikan', 'Hide') : t('Lihat', 'Show')}
+                  </button>
+                </div>
+                <p className="balance-caption">{t('Saldo acuan sebelum pengeluaran berikutnya.', 'Baseline balance before upcoming expenses.')}</p>
                 <div className="quick-metrics">
-                  <span>{transactions.length} transaksi</span>
-                  <span>{budgets.length} kantong aktif</span>
+                  <span>{transactions.length} {t('transaksi', 'transactions')}</span>
+                  <span>{budgets.length} {t('kantong aktif', 'active pockets')}</span>
                 </div>
               </div>
             </section>
 
-            <section className="split-grid cashflow-grid-5">
-              <article className="inset cashflow-card income-card">
-                <p className="cashflow-label">Pemasukan</p>
-                <strong>{currency(dashboard?.summary?.income)}</strong>
-                <small>Uang masuk selama periode berjalan.</small>
-              </article>
-              <article className="inset cashflow-card expense-card">
-                <p className="cashflow-label">Pengeluaran</p>
-                <strong>{currency(dashboard?.summary?.expense)}</strong>
-                <small>Uang keluar selama periode berjalan.</small>
-              </article>
-              <article className="inset cashflow-card saving-card">
-                <p className="cashflow-label">Saving Rate</p>
-                <strong>{dashboard?.summary?.saving_rate || 0}%</strong>
-                <small>Persentase pendapatan yang masih tersimpan.</small>
-              </article>
-              <article className="inset cashflow-card hutang-card">
-                <p className="cashflow-label">Cicilan Hutang</p>
-                <strong>{currency(hutangBalance)}</strong>
-                <small>Total cicilan hutang / bulan dari asesmen.</small>
-              </article>
-              <article className="inset cashflow-card emergency-card">
-                <p className="cashflow-label">Dana Darurat</p>
-                <strong>{currency(emergencyBalance)}</strong>
-                <small>Total dana darurat yang tersedia saat ini.</small>
-              </article>
-            </section>
-
-            {/* ── AI Predict Panel (Auto) ───────────────────────────────── */}
             <section className="panel stack">
               <div className="section-head">
-                <h3>🔮 Prediksi Saldo Bulan Depan</h3>
+                <h3>{t('Ringkasan Cashflow', 'Cashflow Overview')}</h3>
                 <p className="helper">
-                  {predictLoading
-                    ? 'Menjalankan prediksi otomatis...'
-                    : 'Otomatis dari saldo & asesmen kamu — Powered by Finary AI'}
+                  {t('Pemasukan dan pengeluaran bulan ini dalam satu tampilan.', 'Income and expense snapshot for this month.')}
                 </p>
               </div>
-              {predictLoading ? (
-                <div className="inset" style={{textAlign:'center',padding:'32px'}}>
-                  <p className="helper">🔮 Sedang memprediksi saldo bulan depan...</p>
-                </div>
-              ) : mlPredictResult ? (
-                <div className="split-grid predict-auto-grid">
-                  <article className="inset predict-result predict-auto-main">
-                    <p className="kicker">Prediksi Saldo Bulan Depan</p>
-                    <p className="balance-amount predict-balance">
-                      {currency(mlPredictResult.predicted_next_month_balance)}
-                    </p>
-                    <div className={`predict-warning-badge ${mlPredictResult.warning_flag ? 'flag-on' : 'flag-off'}`} style={{marginTop:'12px'}}>
-                      {mlPredictResult.warning_flag ? '⚠️ Ada Risiko Keuangan' : '✅ Kondisi Aman'}
+              <div className="split-grid duo dashboard-overview">
+                <article className="inset cashflow-card income-card">
+                  <p className="cashflow-label">{t('Pemasukan', 'Income')}</p>
+                  <strong>{currency(monthlyIncome)}</strong>
+                  <small>{t('Uang masuk selama periode berjalan.', 'Money coming in this period.')}</small>
+                </article>
+                <article className="inset expense-pie-card">
+                  <div className="pie-wrap">
+                    <div className="pie-chart" style={{ background: pieBackground }} aria-hidden="true" />
+                    <div className="pie-center">
+                      <span>{t('Pengeluaran', 'Expense')}</span>
+                      <strong>{currency(expenseSlices.total || monthlyExpense)}</strong>
                     </div>
-                    <div className="prob-row" style={{marginTop:'14px'}}>
-                      <div className="prob-item">
-                        <span>Probabilitas Risiko</span>
-                        <div className="progress-wrap">
-                          <div className={`progress ${mlPredictResult.warning_probability > 0.5 ? 'danger' : ''}`}
-                            style={{ width: `${(mlPredictResult.warning_probability * 100).toFixed(0)}%` }} />
+                  </div>
+                  <div className="pie-legend">
+                    {expenseSlices.slices.length === 0 ? (
+                      <p className="helper">{t('Belum ada pengeluaran per kantong bulan ini.', 'No pocket expenses recorded this month.')}</p>
+                    ) : (
+                      expenseSlices.slices.map((slice) => (
+                        <div className="pie-legend-item" key={slice.label}>
+                          <span className="pie-dot" style={{ background: slice.color }} />
+                          <span>{slice.label}</span>
+                          <strong>{currency(slice.value)}</strong>
                         </div>
-                        <small>{(mlPredictResult.warning_probability * 100).toFixed(0)}%</small>
-                      </div>
-                    </div>
+                      ))
+                    )}
+                  </div>
+                </article>
+              </div>
+              <div className="metric-carousel" role="list">
+                {metricSlides.map((item) => (
+                  <article className="metric-slide" key={item.key} role="listitem">
+                    <p className="metric-label">{item.label}</p>
+                    <strong>{item.value}</strong>
+                    <small>{item.helper}</small>
                   </article>
-                  <article className="inset predict-result">
-                    <h3>💡 Rekomendasi AI</h3>
-                    <ul className="dynamic-profile-warnings">
-                      {(mlPredictResult.recommendations || []).map((rec, i) => (
-                        <li key={i}>{rec}</li>
-                      ))}
-                    </ul>
-                    <div className="predict-data-summary">
-                      <small>📊 Berdasarkan: Pemasukan {currency(Number(predictForm.income))} · Pengeluaran {currency(Number(predictForm.expense))} · Tabungan {currency(Number(predictForm.savings))}</small>
-                    </div>
-                  </article>
-                </div>
-              ) : (
-                <div className="inset">
-                  <p className="helper">Lengkapi asesmen terlebih dahulu agar prediksi bisa berjalan otomatis.</p>
-                </div>
-              )}
+                ))}
+              </div>
             </section>
 
             <section className="panel stack">
               <div className="section-head">
-                <h3>Kantong Aktif</h3>
-                <p className="helper">{budgets.length} kantong terdaftar</p>
+                <h3>{t('Kantong Aktif', 'Active Pockets')}</h3>
+                <p className="helper">{budgets.length} {t('kantong terdaftar', 'pockets registered')}</p>
               </div>
 
               <div className="pocket-grid">
                 {budgets.length === 0 && (
                   <article className="pocket-card empty">
-                    <strong>Belum ada kantong.</strong>
-                    <p>Buka tab Transaksi, lalu tambah kantong budget dulu.</p>
+                    <strong>{t('Belum ada kantong.', 'No pockets yet.')}</strong>
+                    <p>{t('Buka tab Transaksi, lalu tambah kantong budget dulu.', 'Open the Transactions tab and add a budget pocket first.')}</p>
                   </article>
                 )}
 
@@ -1068,7 +1156,7 @@ function App() {
                         style={{ width: `${Math.min(item.progress_percent || 0, 100)}%` }}
                       />
                     </div>
-                    <small>{Math.round(item.progress_percent || 0)}% terpakai</small>
+                    <small>{Math.round(item.progress_percent || 0)}% {t('terpakai', 'used')}</small>
                   </article>
                 ))}
               </div>
@@ -1076,32 +1164,45 @@ function App() {
 
             <section className="panel stack">
               <div className="section-head">
-                <h3>Tren Cashflow Bulanan</h3>
-                <p className="helper">Perbandingan pemasukan vs pengeluaran per bulan</p>
+                <h3>{t('Cashflow Bulan Ini', 'This Month Cashflow')}</h3>
+                <p className="helper">
+                  {t('Perbandingan pemasukan dan pengeluaran bulan berjalan.', 'Income vs expense for the current month.')}
+                </p>
               </div>
 
-              <div className="chart-board">
-                {(dashboard?.monthly_chart || []).map((point) => (
-                  <div className="chart-col" key={point.month}>
-                    <div className="bars">
-                      <div className="bar income" style={{ height: `${(point.income / chartMax) * 100}%` }} />
-                      <div className="bar expense" style={{ height: `${(point.expense / chartMax) * 100}%` }} />
-                    </div>
-                    <small>{point.month}</small>
+              <div className="chart-single">
+                <div className="chart-single-row">
+                  <span>{t('Pemasukan', 'Income')}</span>
+                  <div className="progress-wrap">
+                    <div
+                      className="progress income"
+                      style={{ width: `${(monthlyIncome / monthMax) * 100}%` }}
+                    />
                   </div>
-                ))}
+                  <strong>{currency(monthlyIncome)}</strong>
+                </div>
+                <div className="chart-single-row">
+                  <span>{t('Pengeluaran', 'Expense')}</span>
+                  <div className="progress-wrap">
+                    <div
+                      className="progress expense"
+                      style={{ width: `${(monthlyExpense / monthMax) * 100}%` }}
+                    />
+                  </div>
+                  <strong>{currency(monthlyExpense)}</strong>
+                </div>
               </div>
             </section>
 
             <section className="panel stack">
               <div className="split-grid duo dashboard-bottom">
                 <article className="inset">
-                  <h3>Badge Progress</h3>
+                  <h3>{t('Progress Badge', 'Badge Progress')}</h3>
                   <p>
-                    {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} badges unlocked
+                    {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} {t('badge terbuka', 'badges unlocked')}
                   </p>
                   <p className="achievement-level">
-                    Achievement Level: <strong>Lv {achievementLevel}</strong>
+                    {t('Level Pencapaian', 'Achievement Level')}: <strong>Lv {achievementLevel}</strong>
                   </p>
                   <div className="badge-grid">
                     {(badges?.badges || []).map((badge) => {
@@ -1153,7 +1254,7 @@ function App() {
                           </div>
 
                           <span className={`badge-state ${badge.unlocked ? 'on' : 'off'}`}>
-                            {badge.unlocked ? 'Unlocked' : 'Locked'}
+                            {badge.unlocked ? t('Terbuka', 'Unlocked') : t('Terkunci', 'Locked')}
                           </span>
                         </div>
                       )
@@ -1162,7 +1263,7 @@ function App() {
                 </article>
 
                 <article className="inset leaderboard-panel">
-                  <h3>Leaderboard</h3>
+                  <h3>{t('Leaderboard', 'Leaderboard')}</h3>
                   <ol className="leaderboard">
                     {leaderboard.map((item) => (
                       <li key={`${item.name}-${item.rank}`}>
@@ -1178,129 +1279,124 @@ function App() {
         )}
 
         {activeTab === 'profile' && (
-          <section className="panel stack">
-            <div className="split-grid duo profile-grid">
-              <article className="inset profile-card">
-                <h3>Data Diri</h3>
-                <div className="profile-meta">
-                  <p>Nama: <strong>{user.name || '-'}</strong></p>
-                  <p>Email: <strong>{user.email || '-'}</strong></p>
-                  <p>Status akun: <strong>{assessment ? 'Aktif' : 'Belum assessment'}</strong></p>
-                  <p>Bergabung: <strong>{user.created_at ? compactDate(user.created_at) : '-'}</strong></p>
-                </div>
-              </article>
-
-              <article className="inset profile-card">
-                <h3>Status Finansial AI</h3>
-                <div className="profile-mode-row">
-                  <span className={`ml-classify-badge ml-${assessment?.classification || 'unknown'}`}>
-                    {assessment ? (assessment.classification || '-').toUpperCase() : 'BELUM ASSESSMENT'}
-                  </span>
-                </div>
-                <div className="profile-meta">
-                  <p>Spending habit: <strong>{profile?.spending_habit || '-'}</strong></p>
-                  <p>Income pattern: <strong>{profile?.income_pattern || '-'}</strong></p>
-                  <p>Saving behavior: <strong>{profile?.saving_behavior || '-'}</strong></p>
-                  <p>Posisi leaderboard: <strong>{userLeaderboardRow ? `#${userLeaderboardRow.rank}` : '-'}</strong></p>
-                </div>
-              </article>
-            </div>
-
-            <div className="split-grid duo profile-grid">
-              <article className="inset dynamic-profile-card">
-                <h3>Insight Prediksi AI</h3>
-                {mlPredictResult ? (
-                  <>
-                    <p className="kicker">Prediksi saldo bulan depan</p>
-                    <p className="balance-amount predict-balance">
-                      {currency(mlPredictResult.predicted_next_month_balance)}
-                    </p>
-                    <div className={`predict-warning-badge ${mlPredictResult.warning_flag ? 'flag-on' : 'flag-off'}`}
-                      style={{marginTop: '8px'}}>
-                      {mlPredictResult.warning_flag ? '⚠️ Ada Risiko Keuangan' : '✅ Kondisi Aman'}
-                    </div>
-                    <div className="prob-row" style={{marginTop: '10px'}}>
-                      <div className="prob-item">
-                        <span>Risk prob.</span>
-                        <div className="progress-wrap">
-                          <div className={`progress ${mlPredictResult.warning_probability > 0.5 ? 'danger' : ''}`}
-                            style={{ width: `${(mlPredictResult.warning_probability * 100).toFixed(0)}%` }} />
-                        </div>
-                        <small>{(mlPredictResult.warning_probability * 100).toFixed(0)}%</small>
-                      </div>
-                    </div>
-                    <h4 style={{marginTop:'10px'}}>Rekomendasi AI</h4>
-                    <ul className="dynamic-profile-warnings">
-                      {(mlPredictResult.recommendations || []).map((rec, i) => (
-                        <li key={i}>{rec}</li>
-                      ))}
-                    </ul>
-                  </>
+          <section className="panel stack profile-simple">
+            <div className="profile-header">
+              <div className="profile-avatar">
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt={t('Foto profil', 'Profile photo')} />
                 ) : (
-                  <>
-                    <p className="helper">Jalankan prediksi dari tab <strong>Dashboard</strong> agar hasil muncul di sini.</p>
-                    {profile?.prediction?.next_month_balance != null && (
-                      <p>Prediksi Laravel: <strong>{currency(profile.prediction.next_month_balance)}</strong></p>
-                    )}
-                    <ul className="dynamic-profile-warnings">
-                      {(profile?.warnings || []).length === 0 && (
-                        <li>Tidak ada warning. Pertahankan ritme keuanganmu.</li>
-                      )}
-                      {(profile?.warnings || []).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </>
+                  <div className="profile-avatar-fallback">{userInitials}</div>
                 )}
-              </article>
-
-              <article className="inset profile-achievement-card">
-                <h3>Achievement Terbaru</h3>
-                <p>
-                  {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} badges unlocked
-                </p>
-
-                <div className="profile-achievement-list">
-                  {latestUnlockedBadges.length === 0 && (
-                    <p className="helper">Belum ada badge yang terbuka.</p>
+              </div>
+              <div className="profile-header-main">
+                <h2>{user.name || '-'}</h2>
+                <p>{user.email || '-'}</p>
+                <div className="profile-meta-row">
+                  <span>{t('Status akun', 'Account status')}: <strong>{assessment ? t('Aktif', 'Active') : t('Belum assessment', 'Assessment pending')}</strong></span>
+                  <span>{t('Bergabung', 'Joined')}: <strong>{user.created_at ? compactDate(user.created_at) : '-'}</strong></span>
+                </div>
+                <div className="profile-actions">
+                  <label className="button ghost tiny" htmlFor="profile-photo-input">
+                    {t('Ganti Foto', 'Change Photo')}
+                  </label>
+                  <input
+                    id="profile-photo-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePhotoChange}
+                    hidden
+                  />
+                  {profilePhoto && (
+                    <button
+                      type="button"
+                      className="button ghost tiny"
+                      onClick={() => setProfilePhoto('')}
+                    >
+                      {t('Hapus Foto', 'Remove Photo')}
+                    </button>
                   )}
+                </div>
+              </div>
+              <div className="profile-status-chip">
+                <span className={`ml-classify-badge ml-${assessment?.classification || 'unknown'}`}>
+                  {assessment ? (assessment.classification || '-').toUpperCase() : t('BELUM ASSESSMENT', 'NOT ASSESSED')}
+                </span>
+              </div>
+            </div>
 
-                  {latestUnlockedBadges.map((badge) => {
-                    const level = getBadgeLevel(badge.key)
-
-                    return (
-                      <article className="profile-achievement-item" key={`latest-${badge.key}`}>
-                        <div className="badge-photo-wrap" aria-hidden="true">
-                          <img
-                            className="badge-photo"
-                            src={getBadgeIcon(badge.key, level)}
-                            data-base-src={getBadgeBaseIcon(badge.key)}
-                            data-fallback-stage="level"
-                            alt={`${badge.name} level ${level}`}
-                            loading="lazy"
-                            onError={(event) => {
-                              const stage = event.currentTarget.dataset.fallbackStage || 'level'
-                              if (stage === 'level') {
-                                event.currentTarget.dataset.fallbackStage = 'base'
-                                event.currentTarget.src = event.currentTarget.dataset.baseSrc || defaultBadgeIcon
-                                return
-                              }
-
-                              event.currentTarget.onerror = null
-                              event.currentTarget.src = defaultBadgeIcon
-                            }}
-                          />
-                        </div>
-                        <div className="profile-achievement-copy">
-                          <strong>{badge.name}</strong>
-                          <small>{badge.description}</small>
-                        </div>
-                      </article>
-                    )
-                  })}
+            <div className="split-grid duo profile-grid">
+              <article className="inset profile-card simple">
+                <h3>{t('Ringkasan Finansial', 'Financial Summary')}</h3>
+                <div className="profile-meta">
+                  <p>{t('Kebiasaan belanja', 'Spending habit')}: <strong>{profile?.spending_habit || '-'}</strong></p>
+                  <p>{t('Pola pemasukan', 'Income pattern')}: <strong>{profile?.income_pattern || '-'}</strong></p>
+                  <p>{t('Perilaku menabung', 'Saving behavior')}: <strong>{profile?.saving_behavior || '-'}</strong></p>
+                  <p>{t('Posisi leaderboard', 'Leaderboard position')}: <strong>{userLeaderboardRow ? `#${userLeaderboardRow.rank}` : '-'}</strong></p>
                 </div>
               </article>
+
+              <article className="inset profile-card simple">
+                <h3>{t('Peringatan & Rekomendasi', 'Warnings & Recommendations')}</h3>
+                <ul className="dynamic-profile-warnings">
+                  {(profile?.warnings || []).length === 0 && (profile?.recommendations || []).length === 0 && (
+                    <li>{t('Tidak ada peringatan. Pertahankan ritme keuanganmu.', 'No warnings yet. Keep up the good rhythm.')}</li>
+                  )}
+                  {(profile?.warnings || []).map((item) => (
+                    <li key={`warning-${item}`}>{item}</li>
+                  ))}
+                  {(profile?.recommendations || []).map((item) => (
+                    <li key={`rec-${item}`}>{item}</li>
+                  ))}
+                </ul>
+              </article>
             </div>
+
+            <article className="inset profile-achievement-card">
+              <h3>{t('Achievement Terbaru', 'Latest Achievements')}</h3>
+              <p>
+                {badges?.summary?.unlocked_count || 0} / {badges?.summary?.total_badges || 0} {t('badge terbuka', 'badges unlocked')}
+              </p>
+
+              <div className="profile-achievement-list">
+                {latestUnlockedBadges.length === 0 && (
+                  <p className="helper">{t('Belum ada badge yang terbuka.', 'No badges unlocked yet.')}</p>
+                )}
+
+                {latestUnlockedBadges.map((badge) => {
+                  const level = getBadgeLevel(badge.key)
+
+                  return (
+                    <article className="profile-achievement-item" key={`latest-${badge.key}`}>
+                      <div className="badge-photo-wrap" aria-hidden="true">
+                        <img
+                          className="badge-photo"
+                          src={getBadgeIcon(badge.key, level)}
+                          data-base-src={getBadgeBaseIcon(badge.key)}
+                          data-fallback-stage="level"
+                          alt={`${badge.name} level ${level}`}
+                          loading="lazy"
+                          onError={(event) => {
+                            const stage = event.currentTarget.dataset.fallbackStage || 'level'
+                            if (stage === 'level') {
+                              event.currentTarget.dataset.fallbackStage = 'base'
+                              event.currentTarget.src = event.currentTarget.dataset.baseSrc || defaultBadgeIcon
+                              return
+                            }
+
+                            event.currentTarget.onerror = null
+                            event.currentTarget.src = defaultBadgeIcon
+                          }}
+                        />
+                      </div>
+                      <div className="profile-achievement-copy">
+                        <strong>{badge.name}</strong>
+                        <small>{badge.description}</small>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </article>
           </section>
         )}
 
@@ -1308,21 +1404,19 @@ function App() {
           <section className="panel stack">
             <div className="split-grid transactions-grid">
               <form className="inset form-grid" onSubmit={handleTransactionSubmit}>
-                <h3>Input Transaksi</h3>
+                <h3>{t('Input Transaksi', 'Add Transaction')}</h3>
                 <label>
-                  Tipe
+                  {t('Tipe', 'Type')}
                   <select
                     value={transactionForm.type}
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, type: e.target.value }))}
                   >
-                    <option value="income">💰 Income (Pemasukan)</option>
-                    <option value="expense">💸 Expense (Pengeluaran)</option>
-                    <option value="hutang">🏦 Hutang (Cicilan/Pembayaran)</option>
-                    <option value="dana_darurat">🛡️ Dana Darurat (Tabungan Darurat)</option>
+                    <option value="income">💰 {t('Pemasukan', 'Income')}</option>
+                    <option value="expense">💸 {t('Pengeluaran', 'Expense')}</option>
                   </select>
                 </label>
                 <label>
-                  Kantong
+                  {t('Kantong', 'Pocket')}
                   <select
                     value={transactionForm.category}
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, category: e.target.value }))}
@@ -1330,7 +1424,7 @@ function App() {
                     required
                   >
                     {pocketOptions.length === 0 && (
-                      <option value="">Belum ada kantong</option>
+                      <option value="">{t('Belum ada kantong', 'No pockets yet')}</option>
                     )}
                     {pocketOptions.map((item) => (
                       <option key={item} value={item}>{item}</option>
@@ -1338,10 +1432,10 @@ function App() {
                   </select>
                 </label>
                 {pocketOptions.length === 0 && (
-                  <p className="helper">Tambah kantong budget dulu agar transaksi bisa dipilih dari dropdown.</p>
+                  <p className="helper">{t('Tambah kantong budget dulu agar transaksi bisa dipilih dari dropdown.', 'Create a budget pocket first so you can select it here.')}</p>
                 )}
                 <label>
-                  Nominal
+                  {t('Nominal', 'Amount')}
                   <input
                     type="number"
                     min="1"
@@ -1351,7 +1445,7 @@ function App() {
                   />
                 </label>
                 <label>
-                  Tanggal
+                  {t('Tanggal', 'Date')}
                   <input
                     type="date"
                     value={transactionForm.transaction_date}
@@ -1362,20 +1456,22 @@ function App() {
                   />
                 </label>
                 <label>
-                  Catatan
+                  {t('Catatan', 'Notes')}
                   <textarea
                     value={transactionForm.note}
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, note: e.target.value }))}
                   />
                 </label>
-                <button className="button" disabled={loading || pocketOptions.length === 0}>Simpan Transaksi</button>
+                <button className="button" disabled={loading || pocketOptions.length === 0}>
+                  {t('Simpan Transaksi', 'Save Transaction')}
+                </button>
               </form>
 
               <div className="inset">
-                <h3>Kantong Budget</h3>
+                <h3>{t('Kantong Budget', 'Budget Pockets')}</h3>
                 <form className="form-grid compact" onSubmit={handleBudgetSubmit}>
                   <label>
-                    Kategori
+                    {t('Kategori', 'Category')}
                     <input
                       list="category-list"
                       value={budgetForm.category}
@@ -1384,7 +1480,7 @@ function App() {
                     />
                   </label>
                   <label>
-                    Periode (YYYY-MM)
+                    {t('Periode (YYYY-MM)', 'Period (YYYY-MM)')}
                     <input
                       type="month"
                       value={budgetForm.period}
@@ -1393,7 +1489,7 @@ function App() {
                     />
                   </label>
                   <label>
-                    Limit Bulanan
+                    {t('Limit Bulanan', 'Monthly Limit')}
                     <input
                       type="number"
                       min="1"
@@ -1404,7 +1500,7 @@ function App() {
                       required
                     />
                   </label>
-                  <button className="button" disabled={loading}>Simpan Budget</button>
+                  <button className="button" disabled={loading}>{t('Simpan Budget', 'Save Budget')}</button>
                 </form>
 
                 <div className="budget-list">
@@ -1426,11 +1522,61 @@ function App() {
               </div>
             </div>
 
+            <div className="split-grid duo transaction-extra">
+              <form className="inset form-grid compact" onSubmit={handleLoanUpdateSubmit}>
+                <h3>{t('Cicilan Hutang', 'Loan Installment')}</h3>
+                <p className="helper">{t('Perbarui cicilan bulanan dari assessment.', 'Update monthly installments from your assessment.')}</p>
+                <label>
+                  {t('Nominal', 'Amount')}
+                  <input
+                    type="number"
+                    min="0"
+                    value={loanUpdate}
+                    onChange={(e) => setLoanUpdate(e.target.value)}
+                    required
+                  />
+                </label>
+                <p className="helper">
+                  {t('Nilai saat ini', 'Current value')}: <strong>{currency(loanPayment)}</strong>
+                </p>
+                <button className="button" disabled={loading || !assessment}>
+                  {t('Simpan', 'Save')}
+                </button>
+                {!assessment && (
+                  <p className="helper">{t('Lengkapi assessment dulu agar bisa diperbarui.', 'Complete the assessment before updating this value.')}</p>
+                )}
+              </form>
+
+              <form className="inset form-grid compact" onSubmit={handleEmergencyUpdateSubmit}>
+                <h3>{t('Dana Darurat', 'Emergency Fund')}</h3>
+                <p className="helper">{t('Perbarui dana darurat terbaru dari assessment.', 'Update your latest emergency fund value.')}</p>
+                <label>
+                  {t('Nominal', 'Amount')}
+                  <input
+                    type="number"
+                    min="0"
+                    value={emergencyUpdate}
+                    onChange={(e) => setEmergencyUpdate(e.target.value)}
+                    required
+                  />
+                </label>
+                <p className="helper">
+                  {t('Nilai saat ini', 'Current value')}: <strong>{currency(emergencyFund)}</strong>
+                </p>
+                <button className="button" disabled={loading || !assessment}>
+                  {t('Simpan', 'Save')}
+                </button>
+                {!assessment && (
+                  <p className="helper">{t('Lengkapi assessment dulu agar bisa diperbarui.', 'Complete the assessment before updating this value.')}</p>
+                )}
+              </form>
+            </div>
+
             <div className="inset">
               <div className="table-head">
-                <h3>Riwayat Transaksi</h3>
+                <h3>{t('Riwayat Transaksi', 'Transaction History')}</h3>
                 <button className="button ghost" onClick={handleExportCsv} disabled={loading}>
-                  Export CSV
+                  {t('Export CSV', 'Export CSV')}
                 </button>
               </div>
 
@@ -1438,18 +1584,18 @@ function App() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Tanggal</th>
-                      <th>Tipe</th>
-                      <th>Kategori</th>
-                      <th>Nominal</th>
-                      <th>Aksi</th>
+                      <th>{t('Tanggal', 'Date')}</th>
+                      <th>{t('Tipe', 'Type')}</th>
+                      <th>{t('Kategori', 'Category')}</th>
+                      <th>{t('Nominal', 'Amount')}</th>
+                      <th>{t('Aksi', 'Action')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {transactions.map((item) => (
                       <tr key={item.id}>
                         <td>{compactDate(item.transaction_date)}</td>
-                        <td>{item.type}</td>
+                        <td>{formatTransactionType(item.type)}</td>
                         <td>{item.category}</td>
                         <td>{currency(item.amount)}</td>
                         <td>
@@ -1458,7 +1604,7 @@ function App() {
                             onClick={() => handleDeleteTransaction(item.id)}
                             disabled={loading}
                           >
-                            Hapus
+                            {t('Hapus', 'Delete')}
                           </button>
                         </td>
                       </tr>
@@ -1474,47 +1620,47 @@ function App() {
           <section className="panel stack">
             <div className="split-grid duo">
               <form className="inset form-grid" onSubmit={handleAssessmentSubmit}>
-                <h3>Financial Assessment</h3>
-                <p className="helper">6 field input — dikirim ke model AI (<strong>/classify</strong> &amp; <strong>/predict</strong>) untuk klasifikasi &amp; prediksi otomatis.</p>
+                <h3>{t('Assessment Finansial', 'Financial Assessment')}</h3>
+                <p className="helper">{t('6 field input — dikirim ke model AI (/classify) untuk klasifikasi otomatis.', '6 input fields — sent to the AI model (/classify) for automatic classification.')}</p>
 
-                <label>Pendapatan Bulanan (IDR)
+                <label>{t('Pendapatan Bulanan (IDR)', 'Monthly Income (IDR)')}
                   <input type="number" min="1" value={assessmentForm.monthly_income}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_income: e.target.value }))} required />
                 </label>
-                <label>Total Pengeluaran Bulanan (IDR)
+                <label>{t('Total Pengeluaran Bulanan (IDR)', 'Total Monthly Expenses (IDR)')}
                   <input type="number" min="0" value={assessmentForm.monthly_expense}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_expense: e.target.value }))} required />
                 </label>
-                <label>Tabungan Aktual Bulan Ini (IDR)
+                <label>{t('Tabungan Aktual Bulan Ini (IDR)', 'Actual Savings This Month (IDR)')}
                   <input type="number" min="0" value={assessmentForm.actual_savings}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, actual_savings: e.target.value }))} required />
                 </label>
-                <label>Target Tabungan / Budget Goal (IDR)
+                <label>{t('Target Tabungan / Budget Goal (IDR)', 'Savings Target / Budget Goal (IDR)')}
                   <input type="number" min="0" value={assessmentForm.budget_goal}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, budget_goal: e.target.value }))} required />
                 </label>
-                <label>Cicilan Hutang / Bulan (IDR)
+                <label>{t('Cicilan Hutang / Bulan (IDR)', 'Loan Installment / Month (IDR)')}
                   <input type="number" min="0" value={assessmentForm.loan_payment}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, loan_payment: e.target.value }))} required />
                 </label>
-                <label>Dana Darurat saat ini (IDR)
+                <label>{t('Dana Darurat saat ini (IDR)', 'Emergency Fund (IDR)')}
                   <input type="number" min="0" value={assessmentForm.emergency_fund}
                     onChange={(e) => setAssessmentForm((p) => ({ ...p, emergency_fund: e.target.value }))} required />
                 </label>
 
                 <button className="button" disabled={loading}>
-                  {loading ? '🤖 Menganalisis...' : '🤖 Simpan & Analisis AI'}
+                  {loading ? t('🤖 Menganalisis...', '🤖 Analyzing...') : t('🤖 Simpan & Analisis AI', '🤖 Save & Analyze')}
                 </button>
               </form>
 
               <article className="inset assessment-preview">
-                <h3>Hasil Klasifikasi AI</h3>
+                <h3>{t('Hasil Klasifikasi AI', 'AI Classification Result')}</h3>
                 {mlClassifyResult ? (
                   <>
                     <div className={`ml-classify-badge ml-${mlClassifyResult.classification}`}>
                       {mlClassifyResult.classification?.toUpperCase()}
                     </div>
-                    <p>Confidence: <strong>{(mlClassifyResult.score * 100).toFixed(1)}%</strong></p>
+                    <p>{t('Kepercayaan', 'Confidence')}: <strong>{(mlClassifyResult.score * 100).toFixed(1)}%</strong></p>
                     <p className="helper">{mlClassifyResult.explanation}</p>
                     <div className="prob-row">
                       {Object.entries(mlClassifyResult.probabilities || {}).map(([k, v]) => (
@@ -1528,7 +1674,7 @@ function App() {
                       ))}
                     </div>
                     <div className="risk-flags">
-                      <h4>Risk Flags</h4>
+                      <h4>{t('Penanda Risiko', 'Risk Flags')}</h4>
                       {Object.entries(mlClassifyResult.risk_flags || {}).map(([k, v]) => (
                         <span key={k} className={`risk-flag ${v ? 'flag-on' : 'flag-off'}`}>
                           {v ? '⚠️' : '✅'} {k.replace(/_/g, ' ')}
@@ -1538,10 +1684,10 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <p className="helper">Kirim form untuk analisis AI real-time.</p>
+                    <p className="helper">{t('Kirim form untuk analisis AI real-time.', 'Submit the form for real-time AI analysis.')}</p>
                     {assessment && (
                       <>
-                        <p>Klasifikasi tersimpan:</p>
+                        <p>{t('Klasifikasi tersimpan', 'Saved classification')}:</p>
                         <div className={`ml-classify-badge ml-${assessment.classification}`}>
                           {(assessment.classification || '-').toUpperCase()}
                         </div>
@@ -1558,26 +1704,26 @@ function App() {
           <section className="panel stack">
             <article className="inset hustle-hero">
               <form className="form-grid form-tight" onSubmit={handleRecommendationSubmit}>
-                <h3>Rekomendasi Side Hustle — AI</h3>
-                <p className="helper">Powered by <strong>/recommend-side-hustle</strong> AI model.</p>
-                <label>Level Pengalaman
+                <h3>{t('Rekomendasi Side Hustle — AI', 'Side Hustle Recommendations — AI')}</h3>
+                <p className="helper">{t('Powered by /recommend-side-hustle AI model.', 'Powered by /recommend-side-hustle AI model.')}</p>
+                <label>{t('Level Pengalaman', 'Experience Level')}
                   <select value={recommendForm.experience_level}
                     onChange={(e) => setRecommendForm((p) => ({ ...p, experience_level: e.target.value }))}>
                     {experienceLevelOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </label>
-                <label>Kategori Minat
+                <label>{t('Kategori Minat', 'Interest Category')}
                   <select value={recommendForm.interest_category}
                     onChange={(e) => setRecommendForm((p) => ({ ...p, interest_category: e.target.value }))}>
                     {interestCategoryOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </label>
-                <label>Waktu Luang / minggu (jam)
+                <label>{t('Waktu Luang / minggu (jam)', 'Available hours / week')}
                   <input type="number" min="1" max="168" value={recommendForm.available_hours_per_week}
                     onChange={(e) => setRecommendForm((p) => ({ ...p, available_hours_per_week: e.target.value }))} />
                 </label>
                 <button className="button" disabled={mlLoading}>
-                  {mlLoading ? '🤖 Mencari...' : '🤖 Cari Rekomendasi AI'}
+                  {mlLoading ? t('🤖 Mencari...', '🤖 Searching...') : t('🤖 Cari Rekomendasi AI', '🤖 Get AI Recommendations')}
                 </button>
               </form>
             </article>
@@ -1588,14 +1734,14 @@ function App() {
                   <h4>{item.job_category}</h4>
                   <p className="hustle-platform">📍 {item.platform}</p>
                   <p className="hustle-project">{item.project_type}</p>
-                  <p className="hustle-income">Estimasi: <strong>{currency(item.predicted_monthly_earnings_idr)}</strong> / bulan</p>
+                  <p className="hustle-income">{t('Estimasi', 'Estimate')}: <strong>{currency(item.predicted_monthly_earnings_idr)}</strong> / {t('bulan', 'month')}</p>
                 </article>
               ))}
               {mlSideHustleResult !== null && mlSideHustleResult.length === 0 && (
-                <p className="helper">Tidak ada rekomendasi. Coba ubah parameter.</p>
+                <p className="helper">{t('Tidak ada rekomendasi. Coba ubah parameter.', 'No recommendations yet. Try adjusting the inputs.')}</p>
               )}
               {mlSideHustleResult === null && (
-                <p className="helper">Pilih parameter dan klik &quot;Cari Rekomendasi AI&quot;.</p>
+                <p className="helper">{t('Pilih parameter dan klik "Cari Rekomendasi AI".', 'Choose parameters and click "Get AI Recommendations".')}</p>
               )}
             </div>
           </section>
@@ -1605,9 +1751,9 @@ function App() {
           <section className="panel stack">
             <div className="split-grid duo">
               <form className="inset form-grid form-tight" onSubmit={handleForumSubmit}>
-                <h3>Post Baru</h3>
+                <h3>{t('Post Baru', 'New Post')}</h3>
                 <label>
-                  Judul
+                  {t('Judul', 'Title')}
                   <input
                     value={forumForm.title}
                     onChange={(e) => setForumForm((prev) => ({ ...prev, title: e.target.value }))}
@@ -1615,7 +1761,7 @@ function App() {
                   />
                 </label>
                 <label>
-                  Isi
+                  {t('Isi', 'Content')}
                   <textarea
                     value={forumForm.body}
                     onChange={(e) => setForumForm((prev) => ({ ...prev, body: e.target.value }))}
@@ -1623,18 +1769,18 @@ function App() {
                   />
                 </label>
                 <label>
-                  Tags (pisah koma)
+                  {t('Tags (pisah koma)', 'Tags (comma separated)')}
                   <input
                     value={forumForm.tags}
                     onChange={(e) => setForumForm((prev) => ({ ...prev, tags: e.target.value }))}
                   />
                 </label>
-                <button className="button" disabled={loading}>Publikasikan</button>
+                <button className="button" disabled={loading}>{t('Publikasikan', 'Publish')}</button>
               </form>
 
               <article className="inset forum-info">
-                <h3>Komunitas Finary</h3>
-                <p className="helper">Diskusi, tanya, dan berbagi tips keuangan bersama pengguna lain.</p>
+                <h3>{t('Komunitas Finary', 'Finary Community')}</h3>
+                <p className="helper">{t('Diskusi, tanya, dan berbagi tips keuangan bersama pengguna lain.', 'Discuss, ask, and share financial tips with others.')}</p>
               </article>
             </div>
 
@@ -1653,7 +1799,7 @@ function App() {
 
                   <div className="forum-replies">
                     {(post.replies || []).length === 0 && (
-                      <p className="helper">Belum ada balasan.</p>
+                      <p className="helper">{t('Belum ada balasan.', 'No replies yet.')}</p>
                     )}
 
                     {(post.replies || []).map((reply) => (
@@ -1679,14 +1825,14 @@ function App() {
                           [post.id]: event.target.value,
                         }))
                       }
-                      placeholder="Tulis balasan..."
+                      placeholder={t('Tulis balasan...', 'Write a reply...')}
                       maxLength={1000}
                     />
-                    <button className="button tiny" disabled={loading}>Reply</button>
+                    <button className="button tiny" disabled={loading}>{t('Balas', 'Reply')}</button>
                   </form>
 
                   <div className="meta">
-                    <span>by {post.user?.name || '-'}</span>
+                    <span>{t('oleh', 'by')} {post.user?.name || '-'}</span>
                     <span>{compactDate(post.created_at)}</span>
                   </div>
                 </article>

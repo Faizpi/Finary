@@ -26,6 +26,7 @@ class AssessmentController extends Controller
             'actual_savings'   => ['required', 'numeric', 'min:0'],
             'budget_goal'      => ['required', 'numeric', 'min:0'],
             'emergency_fund'   => ['required', 'numeric', 'min:0'],
+            'loan_payment'     => ['nullable', 'numeric', 'min:0'],
             // ML result passed from frontend after calling HuggingFace
             'classification'   => ['nullable', 'string', 'max:40'],
             'ml_score'         => ['nullable', 'numeric'],
@@ -38,6 +39,7 @@ class AssessmentController extends Controller
             'actual_savings'  => $validated['actual_savings'],
             'budget_goal'     => $validated['budget_goal'],
             'emergency_fund'  => $validated['emergency_fund'],
+            'loan_payment'    => $validated['loan_payment'] ?? 0,
             'classification'  => $validated['classification'] ?? 'unknown',
             'metadata'        => [
                 'ml_score'       => $validated['ml_score'] ?? null,
