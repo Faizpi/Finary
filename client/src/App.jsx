@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import finaryImg from './assets/finary.png'
 import api, {
   assessmentApi,
   authApi,
   budgetApi,
   dashboardApi,
   forumApi,
+  mlApiClient,
   recommendationApi,
   transactionApi,
 } from './lib/api'
 import { compactDate, currency } from './lib/format'
-import { storysetAssets } from './lib/storyset'
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -42,6 +43,26 @@ const skillOptions = [
   'seo',
   'writing',
   'communication',
+]
+
+const experienceLevelOptions = ['Beginner', 'Intermediate', 'Expert']
+
+const interestCategoryOptions = [
+  'App Development',
+  'Web Development',
+  'Graphic Design',
+  'UI/UX Design',
+  'SEO',
+  'Copywriting',
+  'Social Media Management',
+  'Video Editing',
+  'Content Writing',
+  'Data Entry',
+  'Virtual Assistant',
+  'Translation',
+  'Teaching / Tutoring',
+  'Digital Marketing',
+  'Photography',
 ]
 
 const defaultBadgeIcon = 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3c5.svg'
@@ -93,6 +114,25 @@ function App() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
+  // Onboarding: show assessment modal right after register
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // ML state
+  const [mlClassifyResult, setMlClassifyResult] = useState(null)
+  const [mlPredictResult, setMlPredictResult] = useState(null)
+  const [mlSideHustleResult, setMlSideHustleResult] = useState(null)
+  const [mlLoading, setMlLoading] = useState(false)
+  const [predictLoading, setPredictLoading] = useState(false)
+
+  const [predictForm, setPredictForm] = useState({
+    income: '',
+    expense: '',
+    savings: '',
+    target_tabungan: '',
+    loan_payment: '0',
+    emergency_fund: '',
+  })
+
   const [dashboard, setDashboard] = useState(null)
   const [profile, setProfile] = useState(null)
   const [badges, setBadges] = useState(null)
@@ -119,6 +159,10 @@ function App() {
     note: '',
   })
 
+  // Saldo hutang dan dana darurat (from assessment)
+  const [hutangBalance, setHutangBalance] = useState(0)
+  const [emergencyBalance, setEmergencyBalance] = useState(0)
+
   const [budgetForm, setBudgetForm] = useState({
     category: 'Makanan',
     period: currentMonth,
@@ -126,20 +170,18 @@ function App() {
   })
 
   const [assessmentForm, setAssessmentForm] = useState({
-    financial_status: 'seimbang',
-    economic_condition: 'kos',
     monthly_income: '6000000',
     monthly_expense: '4200000',
-    income_sources: 'Gaji',
-    financial_goal: 'Dana darurat 6 bulan',
-    available_hours_per_week: '10',
-    skills: 'design,copywriting,social media',
+    actual_savings: '1800000',
+    budget_goal: '1200000',
+    emergency_fund: '5000000',
+    loan_payment: '0',
   })
 
   const [recommendForm, setRecommendForm] = useState({
-    skills: 'design,copywriting,social media',
+    experience_level: 'Beginner',
     available_hours_per_week: '10',
-    classification: 'Normal',
+    interest_category: 'App Development',
   })
 
   const [forumForm, setForumForm] = useState({
@@ -254,6 +296,9 @@ function App() {
     setAssessment(null)
     setRecommendations([])
     setForumPosts([])
+    setMlPredictResult(null)
+    setHutangBalance(0)
+    setEmergencyBalance(0)
     setIsBootstrapping(false)
   }
 
@@ -274,6 +319,49 @@ function App() {
       }
     })
   }, [pocketOptions])
+
+  // Auto-populate predictForm & auto-run /predict from dashboard + assessment
+  useEffect(() => {
+    if (!dashboard && !assessment) return
+
+    const income         = dashboard?.summary?.income     || assessment?.monthly_income  || 0
+    const expense        = dashboard?.summary?.expense    || assessment?.monthly_expense || 0
+    const savings        = assessment?.actual_savings     || 0
+    const target         = assessment?.budget_goal        || 0
+    const loan           = assessment?.loan_payment       || 0
+    const emergency      = assessment?.emergency_fund     || 0
+
+    // Sync balance cards
+    setHutangBalance(loan)
+    setEmergencyBalance(emergency)
+
+    const next = {
+      income:          String(income),
+      expense:         String(expense),
+      savings:         String(savings),
+      target_tabungan: String(target),
+      loan_payment:    String(loan),
+      emergency_fund:  String(emergency),
+    }
+    setPredictForm(next)
+
+    // Auto-call /predict
+    if (income > 0) {
+      setPredictLoading(true)
+      mlApiClient
+        .predict({
+          income:          Number(income),
+          expense:         Number(expense),
+          savings:         Number(savings),
+          target_tabungan: Number(target),
+          loan_payment:    Number(loan),
+          emergency_fund:  Number(emergency),
+        })
+        .then((res) => setMlPredictResult(res.data))
+        .catch(() => {})
+        .finally(() => setPredictLoading(false))
+    }
+  }, [dashboard, assessment])
 
   useEffect(() => {
     if (!token) {
@@ -334,13 +422,19 @@ function App() {
 
       storeToken(response.data.token)
       setUser(response.data.user)
-      const { latestAssessment } = await refreshAll()
 
-      if (isRegister || !latestAssessment) {
-        setActiveTab('assessment')
-        setMessage('Akun berhasil dibuat. Lengkapi assessment awal untuk personalisasi dashboard.')
+      if (isRegister) {
+        // New flow: show onboarding assessment right away
+        setShowOnboarding(true)
+        setMessage('Akun berhasil dibuat! Lengkapi asesmen finansial kamu dulu.')
       } else {
-        setMessage('Session aktif. Selamat datang di Finary.')
+        const { latestAssessment } = await refreshAll()
+        if (!latestAssessment) {
+          setActiveTab('assessment')
+          setMessage('Selamat datang! Lengkapi assessment awal untuk personalisasi dashboard.')
+        } else {
+          setMessage('Session aktif. Selamat datang di Finary.')
+        }
       }
     } catch (err) {
       if (!err?.response) {
@@ -464,32 +558,94 @@ function App() {
 
   const handleAssessmentSubmit = async (event) => {
     event.preventDefault()
+    setLoading(true)
+    setError('')
+    setMessage('')
 
-    await guardedAction(async () => {
+    try {
+      // 1. Call ML /classify first
+      const mlPayload = {
+        monthly_income: Number(assessmentForm.monthly_income),
+        monthly_expense_total: Number(assessmentForm.monthly_expense),
+        actual_savings: Number(assessmentForm.actual_savings),
+        budget_goal: Number(assessmentForm.budget_goal),
+        emergency_fund: Number(assessmentForm.emergency_fund),
+      }
+
+      const mlRes = await mlApiClient.classify(mlPayload)
+      const classifyData = mlRes.data
+      setMlClassifyResult(classifyData)
+
       await assessmentApi.create({
-        ...assessmentForm,
         monthly_income: Number(assessmentForm.monthly_income),
         monthly_expense: Number(assessmentForm.monthly_expense),
-        available_hours_per_week: Number(assessmentForm.available_hours_per_week),
-        income_sources: splitCsv(assessmentForm.income_sources),
-        skills: splitCsv(assessmentForm.skills),
+        actual_savings: Number(assessmentForm.actual_savings),
+        budget_goal: Number(assessmentForm.budget_goal),
+        emergency_fund: Number(assessmentForm.emergency_fund),
+        loan_payment: Number(assessmentForm.loan_payment || 0),
+        classification: classifyData.classification,
+        ml_score: classifyData.score,
+        ml_explanation: classifyData.explanation,
       })
-    }, 'Assessment tersimpan dan profil finansial diperbarui.')
+
+      await refreshAll()
+      setMessage(`Assessment tersimpan. Klasifikasi AI: ${classifyData.classification} (score: ${(classifyData.score * 100).toFixed(0)}%)`)
+
+      // If onboarding, close modal and go to dashboard
+      if (showOnboarding) {
+        setShowOnboarding(false)
+        setActiveTab('dashboard')
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Assessment gagal, coba lagi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePredictSubmit = async (event) => {
+    event.preventDefault()
+    setPredictLoading(true)
+    setError('')
+    setMessage('')
+    try {
+      const payload = {
+        income:          Number(predictForm.income),
+        expense:         Number(predictForm.expense),
+        savings:         Number(predictForm.savings),
+        target_tabungan: Number(predictForm.target_tabungan),
+        loan_payment:    Number(predictForm.loan_payment),
+        emergency_fund:  Number(predictForm.emergency_fund),
+      }
+      const res = await mlApiClient.predict(payload)
+      setMlPredictResult(res.data)
+      setMessage('Prediksi saldo bulan depan berhasil dimuat dari AI.')
+    } catch (err) {
+      setError(err?.message || 'Gagal menjalankan prediksi AI.')
+    } finally {
+      setPredictLoading(false)
+    }
   }
 
   const handleRecommendationSubmit = async (event) => {
     event.preventDefault()
+    setMlLoading(true)
+    setError('')
+    setMessage('')
 
-    await guardedAction(async () => {
-      const response = await recommendationApi.sideHustles({
-        skills: splitCsv(recommendForm.skills),
+    try {
+      const res = await mlApiClient.sideHustle({
+        experience_level: recommendForm.experience_level,
         available_hours_per_week: Number(recommendForm.available_hours_per_week),
-        classification: recommendForm.classification,
+        interest_category: recommendForm.interest_category,
       })
-
-      setRecommendations(response.data.data?.recommendations || [])
-      setRecommendationSource(response.data.data?.source || '-')
-    }, 'Rekomendasi side hustle diperbarui.')
+      setMlSideHustleResult(res.data.recommendations || [])
+      setMessage('Rekomendasi side hustle dari AI berhasil dimuat.')
+    } catch (err) {
+      setError(err?.message || 'Gagal memuat rekomendasi AI.')
+    } finally {
+      setMlLoading(false)
+    }
   }
 
   const handleForumSubmit = async (event) => {
@@ -573,131 +729,126 @@ function App() {
 
   if (!token || !user) {
     return (
-      <div className="page">
+      <div className="page auth-page">
         <header className="site-header auth-header">
           <div className="brand">Finary</div>
           <button className="button ghost" onClick={handleDemoLogin} disabled={loading}>
-            Masuk Demo
+            {loading ? 'Memuat...' : 'Masuk Demo'}
           </button>
         </header>
 
-        <main className="hero-layout auth-layout">
-          <section className="hero-visual panel auth-visual">
-            <div className="hero-visual-frame">
-              <img src={storysetAssets.hero} alt="Finance illustration from Storyset" />
+        <main className="auth-center">
+          <div className="auth-box">
+            <div className="auth-brand-block auth-brand-image">
+              <img src={finaryImg} alt="Finary" className="auth-finary-img" />
+              <h1>Finary</h1>
+              <p>Kelola keuanganmu dengan cerdas — didukung AI.</p>
             </div>
-            <ul className="feature-checklist auth-support-list">
-              <li>Ringkasan cashflow harian.</li>
-              <li>Assessment awal otomatis.</li>
-              <li>Rekomendasi side hustle relevan.</li>
-            </ul>
-          </section>
 
-          <section className="panel panel-pop auth-form-panel">
-            <form className="auth-grid" onSubmit={handleAuthSubmit}>
-              <div className="auth-card-head">
-                <h2>{authMode === 'login' ? 'Masuk ke Finary' : 'Buat akun baru'}</h2>
-                <p>
-                  {authMode === 'login'
-                    ? 'Masukkan email dan password untuk lanjut.'
-                    : 'Isi data akun untuk mulai daftar.'}
-                </p>
-              </div>
+            <div className="panel auth-form-panel">
+              <form className="auth-grid" onSubmit={handleAuthSubmit}>
+                <div className="auth-card-head">
+                  <h2>{authMode === 'login' ? 'Masuk ke Finary' : 'Buat akun baru'}</h2>
+                  <p>{authMode === 'login' ? 'Masukkan email dan password.' : 'Isi data untuk mulai daftar.'}</p>
+                </div>
 
-              {authMode === 'register' && (
-                <label>
-                  Nama
-                  <input
-                    value={authForm.name}
-                    onChange={(e) => setAuthForm((prev) => ({ ...prev, name: e.target.value }))}
-                    required
-                  />
+                {authMode === 'register' && (
+                  <label>Nama
+                    <input value={authForm.name} onChange={(e) => setAuthForm((p) => ({ ...p, name: e.target.value }))} required />
+                  </label>
+                )}
+                <label>Email
+                  <input type="email" value={authForm.email} onChange={(e) => setAuthForm((p) => ({ ...p, email: e.target.value }))} required />
                 </label>
-              )}
-
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={authForm.email}
-                  onChange={(e) => setAuthForm((prev) => ({ ...prev, email: e.target.value }))}
-                  required
-                />
-              </label>
-
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={authForm.password}
-                  onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
-                  required
-                />
-              </label>
-
-              {authMode === 'register' && (
-                <label>
-                  Konfirmasi Password
-                  <input
-                    type="password"
-                    value={authForm.password_confirmation}
-                    onChange={(e) =>
-                      setAuthForm((prev) => ({ ...prev, password_confirmation: e.target.value }))
-                    }
-                    required
-                  />
+                <label>Password
+                  <input type="password" value={authForm.password} onChange={(e) => setAuthForm((p) => ({ ...p, password: e.target.value }))} required />
                 </label>
-              )}
+                {authMode === 'register' && (
+                  <label>Konfirmasi Password
+                    <input type="password" value={authForm.password_confirmation} onChange={(e) => setAuthForm((p) => ({ ...p, password_confirmation: e.target.value }))} required />
+                  </label>
+                )}
 
-              <div className="auth-actions">
-                <button className="button" disabled={loading}>
-                  {loading ? 'Loading...' : authMode === 'login' ? 'Login' : 'Register'}
-                </button>
-                <button
-                  type="button"
-                  className="button ghost"
-                  onClick={() => setAuthMode((prev) => (prev === 'login' ? 'register' : 'login'))}
-                >
-                  {authMode === 'login' ? 'Buat akun baru' : 'Punya akun? Login'}
-                </button>
-              </div>
-            </form>
+                {error && <div className="alert error"><span>{error}</span><button type="button" className="alert-close" onClick={() => setError('')}>x</button></div>}
+                {message && <div className="alert success"><span>{message}</span><button type="button" className="alert-close" onClick={() => setMessage('')}>x</button></div>}
 
-            {error && (
-              <div className="alert error">
-                <span>{error}</span>
-                <button
-                  type="button"
-                  className="alert-close"
-                  onClick={() => setError('')}
-                  aria-label="Tutup notifikasi"
-                >
-                  x
-                </button>
-              </div>
-            )}
-            {message && (
-              <div className="alert success">
-                <span>{message}</span>
-                <button
-                  type="button"
-                  className="alert-close"
-                  onClick={() => setMessage('')}
-                  aria-label="Tutup notifikasi"
-                >
-                  x
-                </button>
-              </div>
-            )}
-          </section>
+                <div className="auth-actions">
+                  <button className="button" disabled={loading}>
+                    {loading ? 'Memuat...' : authMode === 'login' ? 'Login' : 'Register'}
+                  </button>
+                  <button type="button" className="button ghost" onClick={() => setAuthMode((p) => (p === 'login' ? 'register' : 'login'))}>
+                    {authMode === 'login' ? 'Buat akun baru' : 'Sudah punya akun? Login'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </main>
 
-        <footer className="credits">
-          by Tim Capstone CC26-PSU008
-        </footer>
+        <footer className="credits">by Tim Capstone CC26-PSU008</footer>
       </div>
     )
   }
+
+  // ── Onboarding Modal (shown right after register) ──────────────────────────
+  if (showOnboarding) {
+    return (
+      <div className="page auth-page">
+        <header className="site-header auth-header">
+          <div className="brand">Finary</div>
+          <span className="onboarding-step">Langkah 1 dari 1 — Asesmen Awal</span>
+        </header>
+        <main className="auth-center">
+          <div className="auth-box onboarding-box">
+            <div className="auth-brand-block auth-brand-image">
+              <img src={finaryImg} alt="Finary" className="auth-finary-img" />
+              <h1>Asesmen Finansial</h1>
+              <p>Isi data keuanganmu agar AI bisa mengklasifikasikan kondisi finansialmu secara akurat.</p>
+            </div>
+            <div className="panel auth-form-panel">
+              <form className="auth-grid" onSubmit={handleAssessmentSubmit}>
+                <div className="auth-card-head">
+                  <h2>Data Keuangan Kamu</h2>
+                  <p>6 field — sesuai dengan input model AI /classify &amp; /predict.</p>
+                </div>
+                <label>Pendapatan Bulanan (IDR)
+                  <input type="number" min="1" value={assessmentForm.monthly_income}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_income: e.target.value }))} required />
+                </label>
+                <label>Total Pengeluaran Bulanan (IDR)
+                  <input type="number" min="0" value={assessmentForm.monthly_expense}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_expense: e.target.value }))} required />
+                </label>
+                <label>Tabungan Aktual Bulan Ini (IDR)
+                  <input type="number" min="0" value={assessmentForm.actual_savings}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, actual_savings: e.target.value }))} required />
+                </label>
+                <label>Target Tabungan / Budget Goal (IDR)
+                  <input type="number" min="0" value={assessmentForm.budget_goal}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, budget_goal: e.target.value }))} required />
+                </label>
+                <label>Cicilan Hutang / Bulan (IDR)
+                  <input type="number" min="0" value={assessmentForm.loan_payment}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, loan_payment: e.target.value }))} required />
+                </label>
+                <label>Dana Darurat saat ini (IDR)
+                  <input type="number" min="0" value={assessmentForm.emergency_fund}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, emergency_fund: e.target.value }))} required />
+                </label>
+                {error && <div className="alert error"><span>{error}</span><button type="button" className="alert-close" onClick={() => setError('')}>x</button></div>}
+                <div className="auth-actions">
+                  <button className="button" disabled={loading}>
+                    {loading ? '🤖 Menganalisis AI...' : '🤖 Analisis & Mulai'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
 
   return (
     <div className="page">
@@ -792,21 +943,20 @@ function App() {
                 <p className="kicker">Saldo Utama</p>
                 <h2>Posisi keuanganmu bulan ini</h2>
                 <p className="balance-amount">{currency(dashboard?.summary?.balance)}</p>
-                <p className="balance-caption">
-                  Ini saldo utama yang jadi acuan sebelum kamu tambah pengeluaran berikutnya.
-                </p>
+                <p className="balance-caption">Saldo acuan sebelum pengeluaran berikutnya.</p>
+                {assessment && (
+                  <div className={`ml-classify-badge ml-${assessment.classification}`} style={{marginTop: '12px'}}>
+                    {(assessment.classification || 'N/A').toUpperCase()}
+                  </div>
+                )}
                 <div className="quick-metrics">
                   <span>{transactions.length} transaksi</span>
                   <span>{budgets.length} kantong aktif</span>
-                  <span>{recommendations.length} ide side hustle</span>
                 </div>
-              </div>
-              <div className="balance-art">
-                <img src={storysetAssets.dashboard} alt="Revenue illustration from Storyset" />
               </div>
             </section>
 
-            <section className="split-grid cashflow-grid">
+            <section className="split-grid cashflow-grid-5">
               <article className="inset cashflow-card income-card">
                 <p className="cashflow-label">Pemasukan</p>
                 <strong>{currency(dashboard?.summary?.income)}</strong>
@@ -822,6 +972,70 @@ function App() {
                 <strong>{dashboard?.summary?.saving_rate || 0}%</strong>
                 <small>Persentase pendapatan yang masih tersimpan.</small>
               </article>
+              <article className="inset cashflow-card hutang-card">
+                <p className="cashflow-label">Cicilan Hutang</p>
+                <strong>{currency(hutangBalance)}</strong>
+                <small>Total cicilan hutang / bulan dari asesmen.</small>
+              </article>
+              <article className="inset cashflow-card emergency-card">
+                <p className="cashflow-label">Dana Darurat</p>
+                <strong>{currency(emergencyBalance)}</strong>
+                <small>Total dana darurat yang tersedia saat ini.</small>
+              </article>
+            </section>
+
+            {/* ── AI Predict Panel (Auto) ───────────────────────────────── */}
+            <section className="panel stack">
+              <div className="section-head">
+                <h3>🔮 Prediksi Saldo Bulan Depan</h3>
+                <p className="helper">
+                  {predictLoading
+                    ? 'Menjalankan prediksi otomatis...'
+                    : 'Otomatis dari saldo & asesmen kamu — Powered by Finary AI'}
+                </p>
+              </div>
+              {predictLoading ? (
+                <div className="inset" style={{textAlign:'center',padding:'32px'}}>
+                  <p className="helper">🔮 Sedang memprediksi saldo bulan depan...</p>
+                </div>
+              ) : mlPredictResult ? (
+                <div className="split-grid predict-auto-grid">
+                  <article className="inset predict-result predict-auto-main">
+                    <p className="kicker">Prediksi Saldo Bulan Depan</p>
+                    <p className="balance-amount predict-balance">
+                      {currency(mlPredictResult.predicted_next_month_balance)}
+                    </p>
+                    <div className={`predict-warning-badge ${mlPredictResult.warning_flag ? 'flag-on' : 'flag-off'}`} style={{marginTop:'12px'}}>
+                      {mlPredictResult.warning_flag ? '⚠️ Ada Risiko Keuangan' : '✅ Kondisi Aman'}
+                    </div>
+                    <div className="prob-row" style={{marginTop:'14px'}}>
+                      <div className="prob-item">
+                        <span>Probabilitas Risiko</span>
+                        <div className="progress-wrap">
+                          <div className={`progress ${mlPredictResult.warning_probability > 0.5 ? 'danger' : ''}`}
+                            style={{ width: `${(mlPredictResult.warning_probability * 100).toFixed(0)}%` }} />
+                        </div>
+                        <small>{(mlPredictResult.warning_probability * 100).toFixed(0)}%</small>
+                      </div>
+                    </div>
+                  </article>
+                  <article className="inset predict-result">
+                    <h3>💡 Rekomendasi AI</h3>
+                    <ul className="dynamic-profile-warnings">
+                      {(mlPredictResult.recommendations || []).map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                      ))}
+                    </ul>
+                    <div className="predict-data-summary">
+                      <small>📊 Berdasarkan: Pemasukan {currency(Number(predictForm.income))} · Pengeluaran {currency(Number(predictForm.expense))} · Tabungan {currency(Number(predictForm.savings))}</small>
+                    </div>
+                  </article>
+                </div>
+              ) : (
+                <div className="inset">
+                  <p className="helper">Lengkapi asesmen terlebih dahulu agar prediksi bisa berjalan otomatis.</p>
+                </div>
+              )}
             </section>
 
             <section className="panel stack">
@@ -977,10 +1191,10 @@ function App() {
               </article>
 
               <article className="inset profile-card">
-                <h3>Status Finansial</h3>
+                <h3>Status Finansial AI</h3>
                 <div className="profile-mode-row">
-                  <span className={`status-pill ${assessment ? 'ready' : 'pending'}`}>
-                    {assessment ? `Mode: ${assessment.classification}` : 'Assessment awal dibutuhkan'}
+                  <span className={`ml-classify-badge ml-${assessment?.classification || 'unknown'}`}>
+                    {assessment ? (assessment.classification || '-').toUpperCase() : 'BELUM ASSESSMENT'}
                   </span>
                 </div>
                 <div className="profile-meta">
@@ -994,26 +1208,50 @@ function App() {
 
             <div className="split-grid duo profile-grid">
               <article className="inset dynamic-profile-card">
-                <h3>Insight Profil</h3>
-                <p>
-                  Prediksi saldo bulan depan: <strong>{currency(profile?.prediction?.next_month_balance)}</strong>
-                </p>
-                <ul className="dynamic-profile-warnings">
-                  {(profile?.warnings || []).length === 0 && (
-                    <li>Tidak ada warning. Pertahankan ritme keuanganmu.</li>
-                  )}
-                  {(profile?.warnings || []).map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-                <div className="profile-recommendations">
-                  <h4>Rekomendasi</h4>
-                  <ul className="dynamic-profile-warnings">
-                    {(profile?.recommendations || []).map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
+                <h3>Insight Prediksi AI</h3>
+                {mlPredictResult ? (
+                  <>
+                    <p className="kicker">Prediksi saldo bulan depan</p>
+                    <p className="balance-amount predict-balance">
+                      {currency(mlPredictResult.predicted_next_month_balance)}
+                    </p>
+                    <div className={`predict-warning-badge ${mlPredictResult.warning_flag ? 'flag-on' : 'flag-off'}`}
+                      style={{marginTop: '8px'}}>
+                      {mlPredictResult.warning_flag ? '⚠️ Ada Risiko Keuangan' : '✅ Kondisi Aman'}
+                    </div>
+                    <div className="prob-row" style={{marginTop: '10px'}}>
+                      <div className="prob-item">
+                        <span>Risk prob.</span>
+                        <div className="progress-wrap">
+                          <div className={`progress ${mlPredictResult.warning_probability > 0.5 ? 'danger' : ''}`}
+                            style={{ width: `${(mlPredictResult.warning_probability * 100).toFixed(0)}%` }} />
+                        </div>
+                        <small>{(mlPredictResult.warning_probability * 100).toFixed(0)}%</small>
+                      </div>
+                    </div>
+                    <h4 style={{marginTop:'10px'}}>Rekomendasi AI</h4>
+                    <ul className="dynamic-profile-warnings">
+                      {(mlPredictResult.recommendations || []).map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p className="helper">Jalankan prediksi dari tab <strong>Dashboard</strong> agar hasil muncul di sini.</p>
+                    {profile?.prediction?.next_month_balance != null && (
+                      <p>Prediksi Laravel: <strong>{currency(profile.prediction.next_month_balance)}</strong></p>
+                    )}
+                    <ul className="dynamic-profile-warnings">
+                      {(profile?.warnings || []).length === 0 && (
+                        <li>Tidak ada warning. Pertahankan ritme keuanganmu.</li>
+                      )}
+                      {(profile?.warnings || []).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </article>
 
               <article className="inset profile-achievement-card">
@@ -1077,8 +1315,10 @@ function App() {
                     value={transactionForm.type}
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, type: e.target.value }))}
                   >
-                    <option value="income">Income</option>
-                    <option value="expense">Expense</option>
+                    <option value="income">💰 Income (Pemasukan)</option>
+                    <option value="expense">💸 Expense (Pengeluaran)</option>
+                    <option value="hutang">🏦 Hutang (Cicilan/Pembayaran)</option>
+                    <option value="dana_darurat">🛡️ Dana Darurat (Tabungan Darurat)</option>
                   </select>
                 </label>
                 <label>
@@ -1235,107 +1475,80 @@ function App() {
             <div className="split-grid duo">
               <form className="inset form-grid" onSubmit={handleAssessmentSubmit}>
                 <h3>Financial Assessment</h3>
-                <label>
-                  Status Finansial
-                  <select
-                    value={assessmentForm.financial_status}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, financial_status: e.target.value }))
-                    }
-                  >
-                    <option value="defisit">Defisit</option>
-                    <option value="seimbang">Seimbang</option>
-                    <option value="surplus">Surplus</option>
-                  </select>
+                <p className="helper">6 field input — dikirim ke model AI (<strong>/classify</strong> &amp; <strong>/predict</strong>) untuk klasifikasi &amp; prediksi otomatis.</p>
+
+                <label>Pendapatan Bulanan (IDR)
+                  <input type="number" min="1" value={assessmentForm.monthly_income}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_income: e.target.value }))} required />
                 </label>
-                <label>
-                  Kondisi Ekonomi & Tempat Tinggal
-                  <input
-                    value={assessmentForm.economic_condition}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, economic_condition: e.target.value }))
-                    }
-                    required
-                  />
+                <label>Total Pengeluaran Bulanan (IDR)
+                  <input type="number" min="0" value={assessmentForm.monthly_expense}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, monthly_expense: e.target.value }))} required />
                 </label>
-                <label>
-                  Income / bulan
-                  <input
-                    type="number"
-                    min="0"
-                    value={assessmentForm.monthly_income}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, monthly_income: e.target.value }))
-                    }
-                    required
-                  />
+                <label>Tabungan Aktual Bulan Ini (IDR)
+                  <input type="number" min="0" value={assessmentForm.actual_savings}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, actual_savings: e.target.value }))} required />
                 </label>
-                <label>
-                  Expense / bulan
-                  <input
-                    type="number"
-                    min="0"
-                    value={assessmentForm.monthly_expense}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, monthly_expense: e.target.value }))
-                    }
-                    required
-                  />
+                <label>Target Tabungan / Budget Goal (IDR)
+                  <input type="number" min="0" value={assessmentForm.budget_goal}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, budget_goal: e.target.value }))} required />
                 </label>
-                <label>
-                  Sumber Pemasukan (pisah koma)
-                  <input
-                    value={assessmentForm.income_sources}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, income_sources: e.target.value }))
-                    }
-                  />
+                <label>Cicilan Hutang / Bulan (IDR)
+                  <input type="number" min="0" value={assessmentForm.loan_payment}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, loan_payment: e.target.value }))} required />
                 </label>
-                <label>
-                  Target Finansial
-                  <input
-                    value={assessmentForm.financial_goal}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, financial_goal: e.target.value }))
-                    }
-                  />
+                <label>Dana Darurat saat ini (IDR)
+                  <input type="number" min="0" value={assessmentForm.emergency_fund}
+                    onChange={(e) => setAssessmentForm((p) => ({ ...p, emergency_fund: e.target.value }))} required />
                 </label>
-                <label>
-                  Waktu Luang / minggu
-                  <input
-                    type="number"
-                    min="0"
-                    max="168"
-                    value={assessmentForm.available_hours_per_week}
-                    onChange={(e) =>
-                      setAssessmentForm((prev) => ({ ...prev, available_hours_per_week: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  Skills (pisah koma)
-                  <input
-                    list="skill-list"
-                    value={assessmentForm.skills}
-                    onChange={(e) => setAssessmentForm((prev) => ({ ...prev, skills: e.target.value }))}
-                  />
-                </label>
-                <button className="button" disabled={loading}>Generate Profil</button>
+
+                <button className="button" disabled={loading}>
+                  {loading ? '🤖 Menganalisis...' : '🤖 Simpan & Analisis AI'}
+                </button>
               </form>
 
               <article className="inset assessment-preview">
-                <h3>Profil Terbaru</h3>
-                <p>Klasifikasi: <strong>{assessment?.classification || '-'}</strong></p>
-                <p>Goal: {assessment?.financial_goal || '-'}</p>
-                <p>
-                  Source inference: <strong>{assessment?.metadata?.source || 'rule-based'}</strong>
-                </p>
-                <img
-                  className="assessment-illustration"
-                  src={storysetAssets.insight}
-                  alt="Investment insight illustration from Storyset"
-                />
+                <h3>Hasil Klasifikasi AI</h3>
+                {mlClassifyResult ? (
+                  <>
+                    <div className={`ml-classify-badge ml-${mlClassifyResult.classification}`}>
+                      {mlClassifyResult.classification?.toUpperCase()}
+                    </div>
+                    <p>Confidence: <strong>{(mlClassifyResult.score * 100).toFixed(1)}%</strong></p>
+                    <p className="helper">{mlClassifyResult.explanation}</p>
+                    <div className="prob-row">
+                      {Object.entries(mlClassifyResult.probabilities || {}).map(([k, v]) => (
+                        <div key={k} className="prob-item">
+                          <span>{k}</span>
+                          <div className="progress-wrap">
+                            <div className="progress" style={{ width: `${(v * 100).toFixed(0)}%` }} />
+                          </div>
+                          <small>{(v * 100).toFixed(0)}%</small>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="risk-flags">
+                      <h4>Risk Flags</h4>
+                      {Object.entries(mlClassifyResult.risk_flags || {}).map(([k, v]) => (
+                        <span key={k} className={`risk-flag ${v ? 'flag-on' : 'flag-off'}`}>
+                          {v ? '⚠️' : '✅'} {k.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="helper">Kirim form untuk analisis AI real-time.</p>
+                    {assessment && (
+                      <>
+                        <p>Klasifikasi tersimpan:</p>
+                        <div className={`ml-classify-badge ml-${assessment.classification}`}>
+                          {(assessment.classification || '-').toUpperCase()}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </article>
             </div>
           </section>
@@ -1345,59 +1558,45 @@ function App() {
           <section className="panel stack">
             <article className="inset hustle-hero">
               <form className="form-grid form-tight" onSubmit={handleRecommendationSubmit}>
-                <h3>Mesin Rekomendasi Side Hustle</h3>
-                <label>
-                  Skills (pisah koma)
-                  <input
-                    list="skill-list"
-                    value={recommendForm.skills}
-                    onChange={(e) => setRecommendForm((prev) => ({ ...prev, skills: e.target.value }))}
-                  />
-                </label>
-                <label>
-                  Waktu Luang / minggu
-                  <input
-                    type="number"
-                    min="0"
-                    max="168"
-                    value={recommendForm.available_hours_per_week}
-                    onChange={(e) =>
-                      setRecommendForm((prev) => ({ ...prev, available_hours_per_week: e.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Kondisi Finansial
-                  <select
-                    value={recommendForm.classification}
-                    onChange={(e) =>
-                      setRecommendForm((prev) => ({ ...prev, classification: e.target.value }))
-                    }
-                  >
-                    <option value="Inflasi">Inflasi</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Resesi">Resesi</option>
+                <h3>Rekomendasi Side Hustle — AI</h3>
+                <p className="helper">Powered by <strong>/recommend-side-hustle</strong> AI model.</p>
+                <label>Level Pengalaman
+                  <select value={recommendForm.experience_level}
+                    onChange={(e) => setRecommendForm((p) => ({ ...p, experience_level: e.target.value }))}>
+                    {experienceLevelOptions.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </label>
-                <button className="button" disabled={loading}>Cari Rekomendasi</button>
-                <p className="helper">Mode inference saat ini: {recommendationSource}</p>
+                <label>Kategori Minat
+                  <select value={recommendForm.interest_category}
+                    onChange={(e) => setRecommendForm((p) => ({ ...p, interest_category: e.target.value }))}>
+                    {interestCategoryOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </label>
+                <label>Waktu Luang / minggu (jam)
+                  <input type="number" min="1" max="168" value={recommendForm.available_hours_per_week}
+                    onChange={(e) => setRecommendForm((p) => ({ ...p, available_hours_per_week: e.target.value }))} />
+                </label>
+                <button className="button" disabled={mlLoading}>
+                  {mlLoading ? '🤖 Mencari...' : '🤖 Cari Rekomendasi AI'}
+                </button>
               </form>
-
-              <div className="hustle-hero-media">
-                <img src={storysetAssets.budget} alt="Coins illustration from Storyset" />
-              </div>
             </article>
 
             <div className="recommend-grid">
-              {recommendations.map((item) => (
-                <article className="recommend-card" key={item.title}>
-                  <h4>{item.title}</h4>
-                  <p>{item.reason}</p>
-                  <p>Income potential: <strong>{currency(item.estimated_income.low)} - {currency(item.estimated_income.high)}</strong></p>
-                  <p>Channel: {item.channel}</p>
-                  <p>Skill match: {(item.matched_skills || []).join(', ') || '-'}</p>
+              {(mlSideHustleResult || []).map((item, idx) => (
+                <article className="recommend-card" key={`${item.job_category}-${idx}`}>
+                  <h4>{item.job_category}</h4>
+                  <p className="hustle-platform">📍 {item.platform}</p>
+                  <p className="hustle-project">{item.project_type}</p>
+                  <p className="hustle-income">Estimasi: <strong>{currency(item.predicted_monthly_earnings_idr)}</strong> / bulan</p>
                 </article>
               ))}
+              {mlSideHustleResult !== null && mlSideHustleResult.length === 0 && (
+                <p className="helper">Tidak ada rekomendasi. Coba ubah parameter.</p>
+              )}
+              {mlSideHustleResult === null && (
+                <p className="helper">Pilih parameter dan klik &quot;Cari Rekomendasi AI&quot;.</p>
+              )}
             </div>
           </section>
         )}
@@ -1433,13 +1632,9 @@ function App() {
                 <button className="button" disabled={loading}>Publikasikan</button>
               </form>
 
-              <article className="inset forum-preview">
-                <h3>Komunitas</h3>
-                <img
-                  className="forum-illustration"
-                  src={storysetAssets.forum}
-                  alt="Community illustration from Storyset"
-                />
+              <article className="inset forum-info">
+                <h3>Komunitas Finary</h3>
+                <p className="helper">Diskusi, tanya, dan berbagi tips keuangan bersama pengguna lain.</p>
               </article>
             </div>
 

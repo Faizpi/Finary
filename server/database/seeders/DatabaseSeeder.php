@@ -25,23 +25,9 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        Assessment::updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'financial_status' => 'seimbang',
-                'economic_condition' => 'kos',
-                'monthly_income' => 6000000,
-                'monthly_expense' => 4200000,
-                'income_sources' => ['Gaji'],
-                'financial_goal' => 'Dana darurat 6 bulan',
-                'available_hours_per_week' => 10,
-                'skills' => ['design', 'copywriting', 'social media'],
-                'classification' => 'Normal',
-                'metadata' => [
-                    'source' => 'seed',
-                ],
-            ]
-        );
+        // No pre-seeded assessment — user does ML assessment on first login
+        // This ensures classification is always survival | stable | growth from ML
+
 
         $today = now()->toDateString();
         $sampleTransactions = [

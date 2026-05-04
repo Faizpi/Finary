@@ -7,6 +7,20 @@ const api = axios.create({
   },
 })
 
+// ML Microservice (HuggingFace Space)
+const mlApi = axios.create({
+  baseURL: import.meta.env.VITE_ML_API_URL || 'https://raamwhy-finary-model.hf.space',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+export const mlApiClient = {
+  classify: (payload) => mlApi.post('/classify', payload),
+  predict: (payload) => mlApi.post('/predict', payload),
+  sideHustle: (payload) => mlApi.post('/recommend-side-hustle', payload),
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('finary_token')
 

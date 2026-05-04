@@ -317,6 +317,44 @@ ol {
   align-items: stretch;
 }
 
+/* Clean split auth layout */
+.auth-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 68vh;
+  padding: var(--space-lg) 0;
+}
+
+.auth-box {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1fr);
+  gap: var(--space-lg);
+  width: 100%;
+  max-width: 900px;
+}
+
+.onboarding-box {
+  max-width: 1040px;
+}
+
+.auth-brand-block {
+  display: grid;
+  gap: var(--space-sm);
+  align-content: center;
+  padding: var(--space-lg);
+  border: 3px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f0ebff 0%, #e6f8ff 100%);
+  box-shadow: var(--panel-shadow);
+}
+
+.auth-brand-block h1 {
+  font-size: clamp(2rem, 3.5vw, 2.8rem);
+  line-height: 1.05;
+  color: #1a1130;
+}
+
 .panel {
   border: 3px solid var(--line);
   border-radius: 14px;
@@ -543,11 +581,11 @@ textarea {
 
 .balance-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
-  gap: var(--space-lg);
-  align-items: stretch;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  align-items: start;
   background: linear-gradient(135deg, #f8f4ff 0%, #ffffff 44%, #dff4ff 100%);
-  padding: clamp(16px, 1.75vw, 26px);
+  padding: clamp(20px, 2.2vw, 32px);
 }
 
 .balance-copy {
@@ -606,6 +644,12 @@ textarea {
   gap: var(--space-xs);
 }
 
+.cashflow-grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-xs);
+}
+
 .cashflow-card {
   align-content: start;
   gap: 9px;
@@ -621,7 +665,7 @@ textarea {
 
 .cashflow-card strong {
   display: block;
-  font-size: clamp(1.35rem, 2.2vw, 2.05rem);
+  font-size: clamp(1.1rem, 1.8vw, 1.6rem);
   color: #1f1834;
 }
 
@@ -640,6 +684,14 @@ textarea {
 
 .saving-card {
   background: linear-gradient(180deg, #dbf4ff 0%, #eef9ff 100%);
+}
+
+.hutang-card {
+  background: linear-gradient(180deg, #fff3d4 0%, #fffbee 100%);
+}
+
+.emergency-card {
+  background: linear-gradient(180deg, #e8f5e9 0%, #f1fdf1 100%);
 }
 
 .section-head {
@@ -1727,3 +1779,209 @@ th {
     gap: 3px;
   }
 }
+
+/* ── Onboarding step pill ─────────────────────────────────────── */
+.onboarding-step {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--lime-soft);
+}
+
+/* ── ML Classify Badge ────────────────────────────────────────── */
+.ml-classify-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Sora", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 18px;
+  box-shadow: 4px 4px 0 var(--line);
+  letter-spacing: 0.07em;
+}
+
+.ml-classify-badge.ml-growth { background: var(--lime); color: #1a2e00; }
+.ml-classify-badge.ml-stable { background: var(--cyan); color: #00263a; }
+.ml-classify-badge.ml-survival { background: var(--danger); color: #3a000a; }
+.ml-classify-badge.ml-unknown { background: var(--surface-alt); color: var(--ink-soft); }
+
+/* ── Probability Row ──────────────────────────────────────────── */
+.prob-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.prob-item {
+  display: grid;
+  grid-template-columns: 76px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+/* ── Risk Flags ───────────────────────────────────────────────── */
+.risk-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.risk-flags h4 {
+  width: 100%;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  margin-bottom: 2px;
+}
+
+.risk-flag {
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.risk-flag.flag-on { background: var(--danger); }
+.risk-flag.flag-off { background: var(--success); }
+
+/* ── Hustle card fields ───────────────────────────────────────── */
+.hustle-platform { font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); }
+.hustle-project { font-size: 0.88rem; color: var(--ink-soft); }
+.hustle-income {
+  font-size: 0.9rem;
+  border-top: 2px solid var(--line);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+.hustle-income strong { color: #1f1834; }
+
+/* ── auth-box responsive ──────────────────────────────────────── */
+@media (max-width: 760px) {
+  .auth-box {
+    grid-template-columns: 1fr;
+  }
+  .auth-brand-block {
+    padding: var(--space-md);
+  }
+}
+
+/* ── Predict result ───────────────────────────────────────────── */
+.predict-balance {
+  font-size: clamp(1.6rem, 3vw, 2.4rem) !important;
+  line-height: 1.1;
+  margin: 4px 0 8px;
+}
+
+.predict-warning-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.predict-warning-badge.flag-off {
+  background: var(--success);
+  color: #0a2e14;
+}
+
+.predict-warning-badge.flag-on {
+  background: var(--danger);
+  color: #3a000a;
+}
+
+.predict-result {
+  align-content: start;
+}
+
+/* ── Predict auto grid ────────────────────────────────────────── */
+.predict-auto-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.predict-auto-main {
+  background: linear-gradient(135deg, #f8f4ff 0%, #edf9ff 100%);
+}
+
+.predict-data-summary {
+  margin-top: var(--space-sm);
+  padding: var(--space-xs);
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.predict-data-summary small {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ── Auth finary image ────────────────────────────────────────── */
+.auth-brand-image {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  align-content: unset;
+}
+
+.auth-finary-img {
+  width: 100%;
+  height: 340px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 10px 10px 0 0;
+  flex-shrink: 0;
+}
+
+.auth-brand-image h1,
+.auth-brand-image p {
+  padding: 0 var(--space-lg);
+}
+
+.auth-brand-image h1 {
+  padding-top: var(--space-md);
+}
+
+.auth-brand-image p {
+  padding-bottom: var(--space-lg);
+}
+
+/* ── cashflow-grid-5 responsive ───────────────────────────────── */
+@media (max-width: 1100px) {
+  .cashflow-grid-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .cashflow-grid-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .predict-auto-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
