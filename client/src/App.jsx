@@ -6,7 +6,6 @@ import api, {
   budgetApi,
   dashboardApi,
   forumApi,
-  mlApiClient,
   recommendationApi,
   transactionApi,
 } from './lib/api'
@@ -102,6 +101,35 @@ const getBadgeIcon = (key, level) => `/badges/${key}/level-${clampBadgeLevel(lev
 const getBadgeBaseIcon = (key) => `/badges/${key}.png`
 const getBadgeLevel = (key) => badgeLevelByKey[key] || 1
 
+const platformDomains = [
+  ['upwork', 'upwork.com'],
+  ['fiverr', 'fiverr.com'],
+  ['freelancer', 'freelancer.com'],
+  ['instagram', 'instagram.com'],
+  ['preply', 'preply.com'],
+  ['shopee', 'shopee.co.id'],
+  ['tokopedia', 'tokopedia.com'],
+  ['linkedin', 'linkedin.com'],
+  ['tiktok', 'tiktok.com'],
+  ['youtube', 'youtube.com'],
+  ['projects.co.id', 'projects.co.id'],
+  ['sribulancer', 'sribulancer.com'],
+  ['fastwork', 'fastwork.co.id'],
+]
+
+const getPlatformDomain = (platform = '') => {
+  const normalized = platform.toLowerCase()
+  const match = platformDomains.find(([keyword]) => normalized.includes(keyword))
+
+  return match?.[1] || ''
+}
+
+const getPlatformLogo = (platform = '') => {
+  const domain = getPlatformDomain(platform)
+
+  return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : ''
+}
+
 function App() {
   const savedToken = localStorage.getItem('finary_token')
 
@@ -153,8 +181,8 @@ function App() {
     note: '',
   })
 
-  const [loanUpdate, setLoanUpdate] = useState('')
-  const [emergencyUpdate, setEmergencyUpdate] = useState('')
+  const [loanUpdate, setLoanUpdate] = useState(null)
+  const [emergencyUpdate, setEmergencyUpdate] = useState(null)
 
   const [budgetForm, setBudgetForm] = useState({
     category: 'Makanan',
@@ -218,19 +246,23 @@ function App() {
       .filter((item) => item.value > 0)
 
     const total = items.reduce((sum, item) => sum + item.value, 0)
-    let running = 0
-    const slices = items.map((item) => {
+    const { slices } = items.reduce((acc, item) => {
       const percent = total > 0 ? (item.value / total) * 100 : 0
-      const start = running
-      running += percent
-
+      const start = acc.running
+      const end = acc.running + percent
       return {
-        ...item,
-        percent,
-        start,
-        end: running,
+        running: end,
+        slices: [
+          ...acc.slices,
+          {
+            ...item,
+            percent,
+            start,
+            end,
+          },
+        ],
       }
-    })
+    }, { running: 0, slices: [] })
 
     return { slices, total }
   }, [budgets])
@@ -267,6 +299,11 @@ function App() {
   const latestUnlockedBadges = useMemo(
     () => unlockedBadges.slice(-3).reverse(),
     [unlockedBadges],
+  )
+
+  const displayedSideHustles = useMemo(
+    () => mlSideHustleResult ?? recommendations,
+    [mlSideHustleResult, recommendations],
   )
 
   const userLeaderboardRow = useMemo(
@@ -321,6 +358,11 @@ function App() {
 
     return Array.from(new Set(categories)).sort((a, b) => a.localeCompare(b, 'id'))
   }, [budgets])
+  const selectedPocketCategory = pocketOptions.includes(transactionForm.category)
+    ? transactionForm.category
+    : (pocketOptions[0] || '')
+  const loanUpdateValue = loanUpdate ?? (assessment ? String(assessment.loan_payment ?? '') : '')
+  const emergencyUpdateValue = emergencyUpdate ?? (assessment ? String(assessment.emergency_fund ?? '') : '')
 
   const refreshAll = useCallback(async () => {
     const [
@@ -383,29 +425,11 @@ function App() {
     setAssessment(null)
     setRecommendations([])
     setForumPosts([])
-    setLoanUpdate('')
-    setEmergencyUpdate('')
+    setLoanUpdate(null)
+    setEmergencyUpdate(null)
     setIsBalanceVisible(false)
     setIsBootstrapping(false)
   }
-
-  useEffect(() => {
-    if (pocketOptions.length === 0) {
-      setTransactionForm((prev) => (prev.category ? { ...prev, category: '' } : prev))
-      return
-    }
-
-    setTransactionForm((prev) => {
-      if (pocketOptions.includes(prev.category)) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        category: pocketOptions[0],
-      }
-    })
-  }, [pocketOptions])
 
   useEffect(() => {
     localStorage.setItem('finary_lang', language)
@@ -424,15 +448,6 @@ function App() {
 
     localStorage.removeItem('finary_profile_photo')
   }, [profilePhoto])
-
-  useEffect(() => {
-    if (!assessment) {
-      return
-    }
-
-    setLoanUpdate((prev) => (prev ? prev : String(assessment.loan_payment ?? '')))
-    setEmergencyUpdate((prev) => (prev ? prev : String(assessment.emergency_fund ?? '')))
-  }, [assessment])
 
   useEffect(() => {
     if (!token) {
@@ -621,7 +636,7 @@ function App() {
 
   const handleLoanUpdateSubmit = async (event) => {
     event.preventDefault()
-    const payload = buildAssessmentPayload({ loan_payment: Number(loanUpdate || 0) })
+    const payload = buildAssessmentPayload({ loan_payment: Number(loanUpdateValue || 0) })
 
     if (!payload) {
       setError(t('Lengkapi assessment dulu sebelum memperbarui cicilan.', 'Complete the assessment before updating loan installments.'))
@@ -631,13 +646,13 @@ function App() {
 
     await guardedAction(async () => {
       await assessmentApi.create(payload)
-      setLoanUpdate('')
+      setLoanUpdate(null)
     }, t('Cicilan hutang diperbarui.', 'Loan installment updated.'))
   }
 
   const handleEmergencyUpdateSubmit = async (event) => {
     event.preventDefault()
-    const payload = buildAssessmentPayload({ emergency_fund: Number(emergencyUpdate || 0) })
+    const payload = buildAssessmentPayload({ emergency_fund: Number(emergencyUpdateValue || 0) })
 
     if (!payload) {
       setError(t('Lengkapi assessment dulu sebelum memperbarui dana darurat.', 'Complete the assessment before updating emergency funds.'))
@@ -647,7 +662,7 @@ function App() {
 
     await guardedAction(async () => {
       await assessmentApi.create(payload)
-      setEmergencyUpdate('')
+      setEmergencyUpdate(null)
     }, t('Dana darurat diperbarui.', 'Emergency fund updated.'))
   }
 
@@ -663,6 +678,7 @@ function App() {
     await guardedAction(async () => {
       await transactionApi.create({
         ...transactionForm,
+        category: selectedPocketCategory,
         amount: Number(transactionForm.amount),
       })
 
@@ -701,30 +717,22 @@ function App() {
     setMessage('')
 
     try {
-      // 1. Call ML /classify first
-      const mlPayload = {
-        monthly_income: Number(assessmentForm.monthly_income),
-        monthly_expense_total: Number(assessmentForm.monthly_expense),
-        actual_savings: Number(assessmentForm.actual_savings),
-        budget_goal: Number(assessmentForm.budget_goal),
-        emergency_fund: Number(assessmentForm.emergency_fund),
-      }
-
-      const mlRes = await mlApiClient.classify(mlPayload)
-      const classifyData = mlRes.data
-      setMlClassifyResult(classifyData)
-
-      await assessmentApi.create({
+      const response = await assessmentApi.create({
         monthly_income: Number(assessmentForm.monthly_income),
         monthly_expense: Number(assessmentForm.monthly_expense),
         actual_savings: Number(assessmentForm.actual_savings),
         budget_goal: Number(assessmentForm.budget_goal),
         emergency_fund: Number(assessmentForm.emergency_fund),
         loan_payment: Number(assessmentForm.loan_payment || 0),
-        classification: classifyData.classification,
-        ml_score: classifyData.score,
-        ml_explanation: classifyData.explanation,
       })
+      const savedAssessment = response.data.data
+      const classifyData = savedAssessment?.metadata?.classification_result || {
+        classification: savedAssessment?.classification || 'unknown',
+        score: savedAssessment?.ml_score || 0,
+        explanation: savedAssessment?.ml_explanation || '',
+      }
+
+      setMlClassifyResult(classifyData)
 
       await refreshAll()
       setMessage(`Assessment tersimpan. Klasifikasi AI: ${classifyData.classification} (score: ${(classifyData.score * 100).toFixed(0)}%)`)
@@ -748,15 +756,16 @@ function App() {
     setMessage('')
 
     try {
-      const res = await mlApiClient.sideHustle({
+      const res = await recommendationApi.sideHustles({
         experience_level: recommendForm.experience_level,
         available_hours_per_week: Number(recommendForm.available_hours_per_week),
         interest_category: recommendForm.interest_category,
       })
-      setMlSideHustleResult(res.data.recommendations || [])
-      setMessage('Rekomendasi side hustle dari AI berhasil dimuat.')
+      setMlSideHustleResult(res.data.data?.recommendations || [])
+      setRecommendationSource(res.data.data?.source || '-')
+      setMessage('Rekomendasi side hustle berhasil dimuat.')
     } catch (err) {
-      setError(err?.message || 'Gagal memuat rekomendasi AI.')
+      setError(err?.response?.data?.message || err?.message || 'Gagal memuat rekomendasi side hustle.')
     } finally {
       setMlLoading(false)
     }
@@ -1376,6 +1385,33 @@ function App() {
                 </div>
               </article>
 
+              <article className="inset profile-card simple profile-prediction-card">
+                <div className="profile-card-head">
+                  <h3>{t('Prediksi Harian AI', 'Daily AI Prediction')}</h3>
+                  <span className="status-pill ready">{profile?.prediction?.source || '-'}</span>
+                </div>
+                <p className="helper">
+                  {t('Otomatis dihitung sekali per hari dari data dashboard dan assessment terbaru.', 'Automatically calculated once per day from dashboard data and the latest assessment.')}
+                </p>
+                <strong className="predict-balance">
+                  {currency(profile?.prediction?.next_month_balance || 0)}
+                </strong>
+                <div className="prediction-stats">
+                  <span>
+                    {t('Risiko warning', 'Warning risk')}
+                    <strong>{(((profile?.prediction?.warning_probability || 0) * 100)).toFixed(0)}%</strong>
+                  </span>
+                  <span>
+                    {t('Status', 'Status')}
+                    <strong>{profile?.prediction?.warning_flag ? t('Perlu perhatian', 'Needs attention') : t('Terkendali', 'Under control')}</strong>
+                  </span>
+                  <span>
+                    {t('Tanggal', 'Date')}
+                    <strong>{profile?.prediction?.generated_for || '-'}</strong>
+                  </span>
+                </div>
+              </article>
+
               <article className="inset profile-card simple">
                 <h3>{t('Peringatan & Rekomendasi', 'Warnings & Recommendations')}</h3>
                 <ul className="dynamic-profile-warnings">
@@ -1459,7 +1495,7 @@ function App() {
                 <label>
                   {t('Kantong', 'Pocket')}
                   <select
-                    value={transactionForm.category}
+                    value={selectedPocketCategory}
                     onChange={(e) => setTransactionForm((prev) => ({ ...prev, category: e.target.value }))}
                     disabled={pocketOptions.length === 0}
                     required
@@ -1572,7 +1608,7 @@ function App() {
                   <input
                     type="number"
                     min="0"
-                    value={loanUpdate}
+                  value={loanUpdateValue}
                     onChange={(e) => setLoanUpdate(e.target.value)}
                     required
                   />
@@ -1596,7 +1632,7 @@ function App() {
                   <input
                     type="number"
                     min="0"
-                    value={emergencyUpdate}
+                  value={emergencyUpdateValue}
                     onChange={(e) => setEmergencyUpdate(e.target.value)}
                     required
                   />
@@ -1770,18 +1806,43 @@ function App() {
             </article>
 
             <div className="recommend-grid">
-              {(mlSideHustleResult || []).map((item, idx) => (
+              <p className="helper recommend-source">
+                {t('Sumber rekomendasi', 'Recommendation source')}: <strong>{recommendationSource}</strong>
+              </p>
+              {displayedSideHustles.map((item, idx) => {
+                const platformLogo = getPlatformLogo(item.platform)
+
+                return (
                 <article className="recommend-card" key={`${item.job_category}-${idx}`}>
-                  <h4>{item.job_category}</h4>
-                  <p className="hustle-platform">📍 {item.platform}</p>
+                  <div className="recommend-card-head">
+                    <div className="platform-logo" aria-hidden="true">
+                      {platformLogo ? (
+                        <img
+                          src={platformLogo}
+                          alt=""
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <span>{(item.platform || '?').slice(0, 1).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <h4>{item.job_category}</h4>
+                      <p className="hustle-platform">{item.platform || '-'}</p>
+                    </div>
+                  </div>
                   <p className="hustle-project">{item.project_type}</p>
                   <p className="hustle-income">{t('Estimasi', 'Estimate')}: <strong>{currency(item.predicted_monthly_earnings_idr)}</strong> / {t('bulan', 'month')}</p>
                 </article>
-              ))}
-              {mlSideHustleResult !== null && mlSideHustleResult.length === 0 && (
+                )
+              })}
+              {displayedSideHustles.length === 0 && mlSideHustleResult !== null && (
                 <p className="helper">{t('Tidak ada rekomendasi. Coba ubah parameter.', 'No recommendations yet. Try adjusting the inputs.')}</p>
               )}
-              {mlSideHustleResult === null && (
+              {displayedSideHustles.length === 0 && mlSideHustleResult === null && (
                 <p className="helper">{t('Pilih parameter dan klik "Cari Rekomendasi AI".', 'Choose parameters and click "Get AI Recommendations".')}</p>
               )}
             </div>

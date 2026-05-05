@@ -22,15 +22,29 @@ class MlGatewayService
             return null;
         }
 
-        return $this->post('/recommend-side-hustles', $payload);
+        return $this->post('/recommend-side-hustle', $payload);
+    }
+
+    public function predictInsight(array $payload): ?array
+    {
+        if (!config('ml.enabled')) {
+            return null;
+        }
+
+        return $this->post('/predict', $payload);
     }
 
     private function post(string $path, array $payload): ?array
     {
         try {
-            $response = Http::timeout(config('ml.timeout'))
-                ->acceptJson()
-                ->post(rtrim(config('ml.base_url'), '/') . $path, $payload);
+            $client = Http::timeout(config('ml.timeout'))
+                ->acceptJson();
+
+            if (!config('ml.verify_ssl')) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post(rtrim(config('ml.base_url'), '/') . $path, $payload);
 
             if ($response->successful()) {
                 return $response->json();

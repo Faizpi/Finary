@@ -1,80 +1,97 @@
-# ML Integration Plan (Saat Model Sudah Siap)
+# ML Integration Plan
 
-Dokumen ini menjelaskan cara menghubungkan model ML ke backend Laravel yang saat ini sudah berjalan dengan fallback rule-based.
+Laravel acts as the gateway between the React client and the FINARY AI microservice.
 
-## Arsitektur yang Sudah Disiapkan
+## Source of Truth
 
-Laravel sudah memiliki service:
+Use `docsapifinary.json` as the current OpenAPI contract for the AI service.
 
-- app/Services/MlGatewayService.php
-- app/Services/FinancialClassifierService.php
-- app/Services/SideHustleRecommendationService.php
+Current AI endpoints:
 
-Alur saat ini:
+- `POST /classify`
+- `POST /predict`
+- `POST /recommend-side-hustle`
 
-1. Laravel mencoba call service ML jika ML_ENABLED=true.
-2. Jika service ML tidak tersedia/gagal, otomatis fallback ke rule-based.
+## Runtime Flow
 
-## Environment Variable
+1. React calls Laravel API only.
+2. Laravel calls the AI service through `app/Services/MlGatewayService.php`.
+3. If the AI service is unavailable, Laravel falls back to deterministic rule-based logic.
+4. React renders the normalized Laravel response, regardless of whether the source is `ml` or `rule-based`.
 
-Set di server/.env:
+## Environment Variables
 
-- ML_ENABLED=true
-- ML_BASE_URL=http://127.0.0.1:8001
-- ML_TIMEOUT=4
+Set in `server/.env` when overriding defaults:
 
-## Kontrak Endpoint ML yang Diharapkan
+- `ML_ENABLED=true`
+- `ML_BASE_URL=https://raamwhy-finary-model.hf.space`
+- `ML_TIMEOUT=4`
 
-Service ML bisa dibuat dengan FastAPI/Flask.
+## Endpoint Mapping
 
 ### POST /classify
 
-Request JSON:
+Laravel caller:
 
-- financial_status (string)
-- economic_condition (string)
-- monthly_income (number)
-- monthly_expense (number)
-- available_hours_per_week (integer)
-- skills (array string)
+- `FinancialClassifierService`
+- `AssessmentController@store`
 
-Response JSON minimal:
+Request fields:
 
-- classification: Inflasi | Normal | Resesi
-- score: number
-- saving_rate: number
-- recommendation_focus: array string
+- `monthly_income`
+- `monthly_expense_total`
+- `actual_savings`
+- `budget_goal`
+- `emergency_fund`
 
-### POST /recommend-side-hustles
+Expected labels:
 
-Request JSON:
+- `survival`
+- `stable`
+- `growth`
 
-- skills (array string)
-- available_hours_per_week (integer)
-- classification (Inflasi|Normal|Resesi)
+The full classification result is stored in `assessments.metadata.classification_result`.
 
-Response JSON minimal:
+### POST /predict
 
-- recommendations: array
-    - title
-    - estimated_income: { low, high }
-    - channel
-    - min_hours_per_week
-    - matched_skills
-    - match_score
-    - reason
+Laravel caller:
 
-## Checklist Integrasi Produksi
+- `FinancialInsightService@profile`
 
-1. Siapkan service ML + endpoint sesuai kontrak di atas.
-2. Aktifkan ML_ENABLED=true di environment server.
-3. Pastikan ML_BASE_URL bisa diakses dari server Laravel.
-4. Tambahkan authentication antar service bila diperlukan (API key/internal token).
-5. Tambahkan monitoring latency/error di endpoint ML.
+Request fields are generated once per user per day from dashboard summary plus the latest assessment:
 
-## Best Practice
+- `income`
+- `expense`
+- `savings`
+- `target_tabungan`
+- `loan_payment`
+- `emergency_fund`
 
-- Keep fallback aktif untuk reliability.
-- Versioning model di response (contoh: model_version).
-- Logging request-id untuk traceability.
-- Tentukan threshold confidence jika klasifikasi low-confidence perlu fallback ke rule-based.
+The result is cached daily and returned in the profile payload as `prediction`.
+
+### POST /recommend-side-hustle
+
+Laravel caller:
+
+- `SideHustleRecommendationService`
+- `RecommendationController@sideHustles`
+
+Request fields:
+
+- `experience_level`
+- `available_hours_per_week`
+- `interest_category`
+
+Responses are normalized to:
+
+- `job_category`
+- `platform`
+- `project_type`
+- `predicted_monthly_earnings_idr`
+
+## Production Notes
+
+- Keep rule-based fallback enabled for reliability.
+- Keep Laravel as the only public API consumed by React.
+- Add model version and request id when the AI service supports them.
+- Consider invalidating the daily prediction cache when a user changes transactions or assessment data.

@@ -7,9 +7,15 @@ use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class FinancialInsightService
 {
+    public function __construct(private readonly MlGatewayService $mlGateway)
+    {
+    }
+
     public function dashboard(User $user): array
     {
         $start = Carbon::now()->startOfMonth();
@@ -44,8 +50,10 @@ class FinancialInsightService
 
     public function profile(User $user): array
     {
-        $monthly = $this->dashboard($user)['summary'];
+        $dashboard = $this->dashboard($user);
+        $monthly = $dashboard['summary'];
         $expenseRatio = $monthly['income'] > 0 ? $monthly['expense'] / $monthly['income'] : 1;
+        $latestAssessment = $user->assessments()->latest()->first();
 
         if ($expenseRatio > 0.85) {
             $spendingHabit = 'agresif';
@@ -92,17 +100,88 @@ class FinancialInsightService
             $recommendations[] = 'Pertahankan ritme sekarang dan evaluasi target 30 hari ke depan.';
         }
 
+        $prediction = $this->dailyPrediction($user, $monthly, $latestAssessment, $nextMonthPrediction);
+
         return [
             'spending_habit' => $spendingHabit,
             'income_pattern' => $incomePattern,
             'saving_behavior' => $savingBehavior,
             'warnings' => $warnings,
-            'prediction' => [
-                'next_month_balance' => $nextMonthPrediction,
-                'currency' => 'IDR',
-            ],
-            'recommendations' => $recommendations,
+            'prediction' => $prediction,
+            'recommendations' => array_values(array_unique(array_merge(
+                $recommendations,
+                $prediction['recommendations'] ?? [],
+            ))),
         ];
+    }
+
+    private function dailyPrediction(User $user, array $monthly, mixed $latestAssessment, float $fallbackBalance): array
+    {
+        $dateKey = Carbon::now()->toDateString();
+        $cacheKey = "finary:predict:{$user->id}:{$dateKey}";
+
+        return Cache::remember($cacheKey, Carbon::now()->endOfDay(), function () use ($monthly, $latestAssessment, $fallbackBalance, $dateKey) {
+            $payload = [
+                'income' => (float) ($monthly['income'] > 0 ? $monthly['income'] : ($latestAssessment?->monthly_income ?? 0)),
+                'expense' => (float) ($monthly['expense'] > 0 ? $monthly['expense'] : ($latestAssessment?->monthly_expense ?? 0)),
+                'savings' => (float) ($latestAssessment?->actual_savings ?? max($monthly['balance'], 0)),
+                'target_tabungan' => (float) ($latestAssessment?->budget_goal ?? 0),
+                'loan_payment' => (float) ($latestAssessment?->loan_payment ?? 0),
+                'emergency_fund' => (float) ($latestAssessment?->emergency_fund ?? 0),
+            ];
+
+            $mlResult = $this->mlGateway->predictInsight($payload);
+
+            if (
+                is_array($mlResult)
+                && array_key_exists('predicted_next_month_balance', $mlResult)
+                && array_key_exists('warning_probability', $mlResult)
+                && array_key_exists('warning_flag', $mlResult)
+            ) {
+                $predictedBalance = (float) $mlResult['predicted_next_month_balance'];
+                $bounds = $this->predictionBounds($payload);
+                $adjustedBalance = min(max($predictedBalance, $bounds['min']), $bounds['max']);
+
+                if ($adjustedBalance !== $predictedBalance) {
+                    Log::warning('ML prediction out of expected range; clamping', [
+                        'predicted' => $predictedBalance,
+                        'adjusted' => $adjustedBalance,
+                        'min' => $bounds['min'],
+                        'max' => $bounds['max'],
+                        'payload' => $payload,
+                    ]);
+                }
+
+                return [
+                    'next_month_balance' => $adjustedBalance,
+                    'warning_probability' => (float) $mlResult['warning_probability'],
+                    'warning_flag' => (int) $mlResult['warning_flag'],
+                    'recommendations' => array_values($mlResult['recommendations'] ?? []),
+                    'currency' => 'IDR',
+                    'source' => 'ml',
+                    'generated_for' => $dateKey,
+                    'payload' => $payload,
+                ];
+            }
+
+            $expenseRatio = $payload['income'] > 0 ? $payload['expense'] / $payload['income'] : 1;
+            $warningProbability = min(0.95, max(0.05, ($expenseRatio * 0.55) + ($payload['loan_payment'] > 0 ? 0.15 : 0)));
+
+            return [
+                'next_month_balance' => $fallbackBalance,
+                'warning_probability' => round($warningProbability, 4),
+                'warning_flag' => $warningProbability >= 0.65 || $fallbackBalance < 0 ? 1 : 0,
+                'recommendations' => [
+                    $fallbackBalance < 0
+                    ? 'Prioritaskan pemangkasan pengeluaran variabel sebelum akhir bulan.'
+                    : 'Review saldo prediksi harian dan jaga transaksi besar tetap terencana.',
+                ],
+                'currency' => 'IDR',
+                'source' => 'rule-based',
+                'generated_for' => $dateKey,
+                'payload' => $payload,
+            ];
+        });
     }
 
     public function budgetStatus(User $user): array
@@ -245,6 +324,23 @@ class FinancialInsightService
             $row['rank'] = $index + 1;
             return $row;
         })->take(10)->all();
+    }
+
+    private function predictionBounds(array $payload): array
+    {
+        $income = max(0, (float) ($payload['income'] ?? 0));
+        $expense = max(0, (float) ($payload['expense'] ?? 0));
+        $savings = max(0, (float) ($payload['savings'] ?? 0));
+        $emergencyFund = max(0, (float) ($payload['emergency_fund'] ?? 0));
+        $loanPayment = max(0, (float) ($payload['loan_payment'] ?? 0));
+
+        $maxExpected = max($income * 3, $income + $savings + $emergencyFund);
+        $minExpected = -1 * max($expense * 2, $expense + $loanPayment);
+
+        return [
+            'min' => $minExpected,
+            'max' => $maxExpected,
+        ];
     }
 
     private function buildMonthlyChart(User $user, int $months): array

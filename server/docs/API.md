@@ -53,19 +53,19 @@ Butuh token.
 
 Body:
 
-- financial_status (string) contoh: defisit/surplus/seimbang
-- economic_condition (string)
 - monthly_income (number)
 - monthly_expense (number)
-- income_sources (array string, optional)
-- financial_goal (string, optional)
-- available_hours_per_week (integer)
-- skills (array string, optional)
+- actual_savings (number)
+- budget_goal (number)
+- emergency_fund (number)
+- loan_payment (number, optional)
 
 Response penting:
 
-- classification_result.classification: Inflasi | Normal | Resesi
-- classification_result.source: ml | rule-based
+- data.classification: survival | stable | growth
+- data.metadata.classification_result.source: ml | rule-based
+- data.metadata.classification_result.risk_flags
+- data.metadata.classification_result.recommendation_focus
 
 ## Dashboard & Insight
 
@@ -76,6 +76,15 @@ Butuh token.
 ### GET /insights/profile
 
 Butuh token.
+
+Response mencakup `prediction`, dihitung otomatis maksimal sekali per hari per user dari summary dashboard dan assessment terbaru:
+
+- prediction.next_month_balance
+- prediction.warning_probability
+- prediction.warning_flag
+- prediction.recommendations
+- prediction.source: ml | rule-based
+- prediction.generated_for: YYYY-MM-DD
 
 ### GET /insights/badges
 
@@ -140,14 +149,20 @@ Butuh token.
 
 Body (semua optional, otomatis fallback ke assessment terbaru):
 
+- experience_level (Beginner|Intermediate|Expert)
+- interest_category (string)
 - skills (array string)
 - available_hours_per_week (integer)
-- classification (Inflasi|Normal|Resesi)
+- classification (survival|stable|growth)
 
 Response:
 
 - data.source: ml | rule-based
-- data.recommendations: list rekomendasi side hustle + estimasi income
+- data.recommendations: list rekomendasi dengan shape:
+  - job_category
+  - platform
+  - project_type
+  - predicted_monthly_earnings_idr
 
 ## Forum
 

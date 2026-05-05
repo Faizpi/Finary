@@ -1025,6 +1025,44 @@ textarea::placeholder {
   align-items: start;
 }
 
+.profile-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profile-card-head,
+.recommend-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.profile-prediction-card {
+  gap: var(--space-xs);
+}
+
+.prediction-stats {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.prediction-stats span {
+  border: 1px solid var(--subtle-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--inset-shadow-soft);
+  color: var(--text-secondary);
+  display: grid;
+  gap: 3px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 9px 12px;
+}
+
+.prediction-stats strong {
+  font-size: 0.94rem;
+}
+
 .dynamic-profile-card,
 .leaderboard-panel,
 .profile-card,
@@ -1177,6 +1215,39 @@ textarea::placeholder {
 
 .recommend-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recommend-source {
+  grid-column: 1 / -1;
+}
+
+.platform-logo {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--subtle-border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--inset-shadow-soft);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+}
+
+.platform-logo img {
+  width: 26px;
+  height: 26px;
+}
+
+.platform-logo span {
+  color: var(--text-primary);
+  font-family: "Sora", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.recommend-card > .hustle-platform {
+  display: none;
 }
 
 .forum-reply {
