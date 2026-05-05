@@ -770,6 +770,7 @@ textarea::placeholder {
 .hutang-card,
 .emergency-card,
 .expense-pie-card,
+.income-pie-card,
 .profile-card.simple,
 .hustle-hero,
 .predict-auto-main {
@@ -963,9 +964,9 @@ textarea::placeholder {
 
 .profile-header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: var(--space-md);
-  align-items: center;
+  align-items: start;
 }
 
 .profile-avatar {
@@ -998,8 +999,13 @@ textarea::placeholder {
   font-weight: 800;
 }
 
+.profile-header-main {
+  display: grid;
+  gap: 6px;
+}
+
 .profile-header-main h2 {
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
 .profile-meta-row,
@@ -1012,12 +1018,18 @@ textarea::placeholder {
   font-weight: 700;
 }
 
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
 .meta {
   justify-content: space-between;
 }
 
 .profile-status-chip {
-  justify-self: end;
+  align-self: start;
 }
 
 .profile-grid,
@@ -1281,12 +1293,18 @@ tr:last-child td {
   background: var(--state-on);
 }
 
-.ml-classify-badge.ml-stable,
+.ml-classify-badge.ml-stable {
+  background: var(--state-warning);
+}
+
+.ml-classify-badge.ml-survival {
+  background: var(--state-danger);
+}
+
 .ml-classify-badge.ml-unknown {
   background: var(--surface);
 }
 
-.ml-classify-badge.ml-survival,
 .predict-warning-badge.flag-on {
   background: var(--state-danger);
 }
@@ -1413,10 +1431,6 @@ tr:last-child td {
   .profile-header {
     grid-template-columns: 1fr;
     justify-items: start;
-  }
-
-  .profile-status-chip {
-    justify-self: start;
   }
 
   .metric-carousel {

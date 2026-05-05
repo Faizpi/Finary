@@ -208,24 +208,18 @@ function App() {
   const emergencyFund = Number(assessment?.emergency_fund || 0)
   const monthMax = Math.max(monthlyIncome, monthlyExpense, 1)
 
-  const expenseSlices = useMemo(() => {
-    const items = budgets
-      .map((item, index) => ({
-        label: item.category,
-        value: Number(item.spent) || 0,
-        color: pieColors[index % pieColors.length],
-      }))
-      .filter((item) => item.value > 0)
-
-    const total = items.reduce((sum, item) => sum + item.value, 0)
+  const buildPieSlices = useCallback((items) => {
+    const cleaned = items.filter((item) => item.value > 0)
+    const total = cleaned.reduce((sum, item) => sum + item.value, 0)
     let running = 0
-    const slices = items.map((item) => {
+    const slices = cleaned.map((item, index) => {
       const percent = total > 0 ? (item.value / total) * 100 : 0
       const start = running
       running += percent
 
       return {
         ...item,
+        color: pieColors[index % pieColors.length],
         percent,
         start,
         end: running,
@@ -233,19 +227,48 @@ function App() {
     })
 
     return { slices, total }
-  }, [budgets])
+  }, [])
 
-  const pieBackground = useMemo(() => {
-    if (expenseSlices.total <= 0) {
+  const expenseSlices = useMemo(
+    () => buildPieSlices(budgets.map((item) => ({
+      label: item.category,
+      value: Number(item.spent) || 0,
+    }))),
+    [budgets, buildPieSlices],
+  )
+
+  const incomeSlices = useMemo(() => {
+    const incomeMap = new Map()
+    transactions
+      .filter((item) => item.type === 'income')
+      .forEach((item) => {
+        const key = item.category || t('Lainnya', 'Other')
+        const nextValue = (incomeMap.get(key) || 0) + Number(item.amount || 0)
+        incomeMap.set(key, nextValue)
+      })
+
+    const items = Array.from(incomeMap.entries()).map(([label, value]) => ({
+      label,
+      value,
+    }))
+
+    return buildPieSlices(items)
+  }, [transactions, buildPieSlices, t])
+
+  const getPieBackground = useCallback((slicesData) => {
+    if (slicesData.total <= 0) {
       return 'conic-gradient(var(--chart-empty) 0% 100%)'
     }
 
-    const gradient = expenseSlices.slices
+    const gradient = slicesData.slices
       .map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`)
       .join(', ')
 
     return `conic-gradient(${gradient})`
-  }, [expenseSlices])
+  }, [])
+
+  const expensePieBackground = useMemo(() => getPieBackground(expenseSlices), [expenseSlices, getPieBackground])
+  const incomePieBackground = useMemo(() => getPieBackground(incomeSlices), [incomeSlices, getPieBackground])
 
   const achievementLevel = useMemo(() => {
     const unlocked = badges?.summary?.unlocked_count || 0
@@ -1128,14 +1151,31 @@ function App() {
                 </p>
               </div>
               <div className="split-grid duo dashboard-overview">
-                <article className="inset cashflow-card income-card">
-                  <p className="cashflow-label">{t('Pemasukan', 'Income')}</p>
-                  <strong>{currency(monthlyIncome)}</strong>
-                  <small>{t('Uang masuk selama periode berjalan.', 'Money coming in this period.')}</small>
+                <article className="inset income-pie-card">
+                  <div className="pie-wrap">
+                    <div className="pie-chart" style={{ background: incomePieBackground }} aria-hidden="true" />
+                    <div className="pie-center">
+                      <span>{t('Pemasukan', 'Income')}</span>
+                      <strong>{currency(incomeSlices.total || monthlyIncome)}</strong>
+                    </div>
+                  </div>
+                  <div className="pie-legend">
+                    {incomeSlices.slices.length === 0 ? (
+                      <p className="helper">{t('Belum ada pemasukan per kategori bulan ini.', 'No income by category recorded this month.')}</p>
+                    ) : (
+                      incomeSlices.slices.map((slice) => (
+                        <div className="pie-legend-item" key={slice.label}>
+                          <span className="pie-dot" style={{ background: slice.color }} />
+                          <span>{slice.label}</span>
+                          <strong>{currency(slice.value)}</strong>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </article>
                 <article className="inset expense-pie-card">
                   <div className="pie-wrap">
-                    <div className="pie-chart" style={{ background: pieBackground }} aria-hidden="true" />
+                    <div className="pie-chart" style={{ background: expensePieBackground }} aria-hidden="true" />
                     <div className="pie-center">
                       <span>{t('Pengeluaran', 'Expense')}</span>
                       <strong>{currency(expenseSlices.total || monthlyExpense)}</strong>
@@ -1332,6 +1372,13 @@ function App() {
               <div className="profile-header-main">
                 <h2>{user.name || '-'}</h2>
                 <p>{user.email || '-'}</p>
+                {assessment?.classification !== 'stable' && (
+                  <div className="profile-status-chip">
+                    <span className={`ml-classify-badge ml-${assessment?.classification || 'unknown'}`}>
+                      {assessment ? (assessment.classification || '-').toUpperCase() : t('BELUM ASSESSMENT', 'NOT ASSESSED')}
+                    </span>
+                  </div>
+                )}
                 <div className="profile-meta-row">
                   <span>{t('Status akun', 'Account status')}: <strong>{assessment ? t('Aktif', 'Active') : t('Belum assessment', 'Assessment pending')}</strong></span>
                   <span>{t('Bergabung', 'Joined')}: <strong>{user.created_at ? compactDate(user.created_at) : '-'}</strong></span>
@@ -1357,11 +1404,6 @@ function App() {
                     </button>
                   )}
                 </div>
-              </div>
-              <div className="profile-status-chip">
-                <span className={`ml-classify-badge ml-${assessment?.classification || 'unknown'}`}>
-                  {assessment ? (assessment.classification || '-').toUpperCase() : t('BELUM ASSESSMENT', 'NOT ASSESSED')}
-                </span>
               </div>
             </div>
 
