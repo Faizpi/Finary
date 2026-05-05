@@ -26,12 +26,13 @@ class AuthController extends Controller
         ]);
 
         $defaultAssessmentPayload = [
-            'financial_status' => 'seimbang',
-            'economic_condition' => 'awal penggunaan',
             'monthly_income' => 6000000,
             'monthly_expense' => 4200000,
-            'income_sources' => ['Gaji'],
-            'financial_goal' => 'Bangun dana darurat 6 bulan',
+            'monthly_expense_total' => 4200000,
+            'actual_savings' => 1800000,
+            'budget_goal' => 1200000,
+            'emergency_fund' => 5000000,
+            'loan_payment' => 0,
             'available_hours_per_week' => 8,
             'skills' => ['communication'],
         ];
@@ -44,11 +45,11 @@ class AuthController extends Controller
             $user->assessments()->create([
                 ...$defaultAssessmentPayload,
                 'classification' => $classificationResult['classification'],
+                'ml_score' => $classificationResult['score'] ?? null,
+                'ml_explanation' => $classificationResult['explanation'] ?? null,
                 'metadata' => [
-                    'score' => $classificationResult['score'],
-                    'saving_rate' => $classificationResult['saving_rate'],
                     'source' => $classificationResult['source'],
-                    'recommendation_focus' => $classificationResult['recommendation_focus'],
+                    'classification_result' => $classificationResult,
                     'stage' => 'onboarding',
                 ],
             ]);

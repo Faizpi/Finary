@@ -6,52 +6,52 @@ class SideHustleRecommendationService
 {
     private const HUSTLE_CATALOG = [
         [
-            'title' => 'Freelance Social Media Admin',
+            'job_category' => 'Freelance Social Media Admin',
             'skills' => ['social media', 'copywriting', 'design'],
             'min_hours' => 8,
-            'income_low' => 1000000,
-            'income_high' => 3000000,
-            'channel' => 'Freelance platform / UMKM lokal',
+            'predicted_monthly_earnings_idr' => 2200000,
+            'platform' => 'Instagram',
+            'project_type' => 'Content calendar, caption writing, and account operations',
         ],
         [
-            'title' => 'Tutor Online',
+            'job_category' => 'Tutor Online',
             'skills' => ['teaching', 'communication', 'math', 'english'],
             'min_hours' => 6,
-            'income_low' => 800000,
-            'income_high' => 2500000,
-            'channel' => 'Platform kursus online',
+            'predicted_monthly_earnings_idr' => 1800000,
+            'platform' => 'Preply',
+            'project_type' => 'Private tutoring and structured learning sessions',
         ],
         [
-            'title' => 'Jasa Desain Konten',
+            'job_category' => 'Jasa Desain Konten',
             'skills' => ['design', 'canva', 'illustration'],
             'min_hours' => 6,
-            'income_low' => 1200000,
-            'income_high' => 4000000,
-            'channel' => 'Instagram / marketplace jasa',
+            'predicted_monthly_earnings_idr' => 2800000,
+            'platform' => 'Fiverr',
+            'project_type' => 'Social media templates and brand content packages',
         ],
         [
-            'title' => 'Admin Marketplace',
+            'job_category' => 'Admin Marketplace',
             'skills' => ['communication', 'sales', 'spreadsheet'],
             'min_hours' => 10,
-            'income_low' => 1200000,
-            'income_high' => 3500000,
-            'channel' => 'UMKM dan toko online',
+            'predicted_monthly_earnings_idr' => 2400000,
+            'platform' => 'Shopee',
+            'project_type' => 'Product listing, order handling, and customer chat support',
         ],
         [
-            'title' => 'Penulis Artikel SEO',
+            'job_category' => 'Penulis Artikel SEO',
             'skills' => ['writing', 'seo', 'research'],
             'min_hours' => 5,
-            'income_low' => 700000,
-            'income_high' => 3000000,
-            'channel' => 'Agency content / klien direct',
+            'predicted_monthly_earnings_idr' => 2100000,
+            'platform' => 'Upwork',
+            'project_type' => 'SEO blog articles and content optimization',
         ],
         [
-            'title' => 'Data Entry Project',
+            'job_category' => 'Data Entry Project',
             'skills' => ['spreadsheet', 'detail oriented', 'typing'],
             'min_hours' => 4,
-            'income_low' => 500000,
-            'income_high' => 1800000,
-            'channel' => 'Job board paruh waktu',
+            'predicted_monthly_earnings_idr' => 1300000,
+            'platform' => 'Freelancer',
+            'project_type' => 'Spreadsheet cleanup, catalog entry, and admin data tasks',
         ],
     ];
 
@@ -66,36 +66,33 @@ class SideHustleRecommendationService
         if (is_array($mlResult) && isset($mlResult['recommendations']) && is_array($mlResult['recommendations'])) {
             return [
                 'source' => 'ml',
-                'recommendations' => $mlResult['recommendations'],
+                'recommendations' => array_map(fn(array $item) => $this->normalizeRecommendation($item), $mlResult['recommendations']),
             ];
         }
 
-        $skills = array_map('strtolower', (array) ($payload['skills'] ?? []));
+        $skills = array_map('strtolower', (array) ($payload['skills'] ?? [$payload['interest_category'] ?? '']));
         $hours = (int) ($payload['available_hours_per_week'] ?? 0);
-        $classification = (string) ($payload['classification'] ?? 'Normal');
+        $interest = strtolower((string) ($payload['interest_category'] ?? ''));
 
-        $recommendations = array_map(function (array $item) use ($skills, $hours, $classification) {
+        $recommendations = array_map(function (array $item) use ($skills, $hours, $interest) {
             $matchedSkills = array_values(array_intersect($item['skills'], $skills));
             $score = count($matchedSkills) * 20;
 
             $score += $hours >= $item['min_hours'] ? 20 : -20;
 
-            if ($classification === 'Resesi' && $item['min_hours'] <= 6) {
+            if ($interest && str_contains(strtolower($item['job_category'] . ' ' . $item['project_type']), $interest)) {
+                $score += 25;
+            }
+
+            if ($hours <= 6 && $item['min_hours'] <= 6) {
                 $score += 10;
             }
 
-            if ($classification === 'Inflasi' && in_array('seo', $item['skills'], true)) {
-                $score += 5;
-            }
-
             return [
-                'title' => $item['title'],
-                'estimated_income' => [
-                    'low' => $item['income_low'],
-                    'high' => $item['income_high'],
-                ],
-                'channel' => $item['channel'],
-                'min_hours_per_week' => $item['min_hours'],
+                'job_category' => $item['job_category'],
+                'platform' => $item['platform'],
+                'project_type' => $item['project_type'],
+                'predicted_monthly_earnings_idr' => $item['predicted_monthly_earnings_idr'],
                 'matched_skills' => $matchedSkills,
                 'match_score' => $score,
                 'reason' => $this->buildReason($matchedSkills, $hours, $item['min_hours']),
@@ -107,6 +104,21 @@ class SideHustleRecommendationService
         return [
             'source' => 'rule-based',
             'recommendations' => array_slice($recommendations, 0, 5),
+        ];
+    }
+
+    private function normalizeRecommendation(array $item): array
+    {
+        return [
+            'job_category' => (string) ($item['job_category'] ?? $item['title'] ?? 'Side Hustle'),
+            'platform' => (string) ($item['platform'] ?? $item['channel'] ?? 'Freelancer'),
+            'project_type' => (string) ($item['project_type'] ?? $item['reason'] ?? 'Flexible freelance project'),
+            'predicted_monthly_earnings_idr' => (float) (
+                $item['predicted_monthly_earnings_idr']
+                ?? $item['estimated_income']['high']
+                ?? $item['estimated_income']['low']
+                ?? 0
+            ),
         ];
     }
 

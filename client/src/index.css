@@ -15,8 +15,12 @@
   --text-primary: #2d3436;
   --text-secondary: #636e72;
 
-  --primary: #4f46e5;
-  --primary-text: white;
+  --primary: #f0c64f;
+  --primary-text: #1f1b0f;
+  --finance-accent: #f0c64f;
+  --finance-header-bg: color-mix(in srgb, var(--finance-accent) 72%, var(--surface));
+  --finance-chip-bg: color-mix(in srgb, var(--finance-accent) 52%, var(--surface));
+  --finance-border: color-mix(in srgb, var(--finance-accent) 60%, var(--shadow-dark));
   --focus-ring: color-mix(in srgb, var(--primary) 74%, var(--text-primary));
   --subtle-border: rgba(0, 0, 0, 0.05);
   --subtle-border-strong: rgba(0, 0, 0, 0.08);
@@ -37,17 +41,17 @@
   --surface-muted: color-mix(in srgb, var(--surface) 92%, var(--shadow-dark));
   --text-strong: var(--text-primary);
   --text-muted: var(--text-secondary);
-  --state-on: color-mix(in srgb, var(--primary) 24%, var(--surface));
-  --state-warning: color-mix(in srgb, var(--primary) 18%, var(--surface));
-  --state-danger: color-mix(in srgb, var(--text-primary) 20%, var(--surface));
+  --state-on: color-mix(in srgb, var(--primary) 30%, var(--surface));
+  --state-warning: color-mix(in srgb, var(--primary) 44%, var(--surface));
+  --state-danger: color-mix(in srgb, #ff6f6f 28%, var(--surface));
   --chart-empty: color-mix(in srgb, var(--surface) 80%, var(--shadow-dark));
-  --chart-1: color-mix(in srgb, var(--primary) 42%, var(--surface));
-  --chart-2: color-mix(in srgb, var(--text-secondary) 28%, var(--surface));
-  --chart-3: color-mix(in srgb, var(--primary) 28%, var(--shadow-light));
-  --chart-4: color-mix(in srgb, var(--text-primary) 20%, var(--surface));
-  --chart-5: color-mix(in srgb, var(--primary) 18%, var(--surface));
-  --chart-6: color-mix(in srgb, var(--text-secondary) 18%, var(--shadow-light));
-  --chart-7: color-mix(in srgb, var(--primary) 36%, var(--shadow-light));
+  --chart-1: color-mix(in srgb, var(--primary) 62%, var(--surface));
+  --chart-2: color-mix(in srgb, var(--primary) 46%, var(--surface));
+  --chart-3: color-mix(in srgb, var(--primary) 38%, var(--shadow-light));
+  --chart-4: color-mix(in srgb, var(--primary) 30%, var(--surface));
+  --chart-5: color-mix(in srgb, var(--primary) 24%, var(--surface));
+  --chart-6: color-mix(in srgb, var(--primary) 18%, var(--shadow-light));
+  --chart-7: color-mix(in srgb, var(--primary) 54%, var(--shadow-light));
 
   --space-2xs: 6px;
   --space-xs: 10px;
@@ -75,12 +79,16 @@
   --text-primary: #edf2f7;
   --text-secondary: #aeb8c5;
 
-  --primary: #818cf8;
-  --primary-text: #111419;
+  --primary: #f0c64f;
+  --primary-text: #1b160b;
+  --finance-accent: #f0c64f;
+  --finance-header-bg: color-mix(in srgb, var(--finance-accent) 52%, var(--surface));
+  --finance-chip-bg: color-mix(in srgb, var(--finance-accent) 34%, var(--surface));
+  --finance-border: color-mix(in srgb, var(--finance-accent) 38%, var(--shadow-light));
   --subtle-border: rgba(255, 255, 255, 0.06);
   --subtle-border-strong: rgba(255, 255, 255, 0.1);
-  --state-on: color-mix(in srgb, var(--primary) 30%, var(--surface));
-  --state-warning: color-mix(in srgb, var(--primary) 22%, var(--surface));
+  --state-on: color-mix(in srgb, var(--primary) 34%, var(--surface));
+  --state-warning: color-mix(in srgb, var(--primary) 48%, var(--surface));
   --state-danger: color-mix(in srgb, #ff8fa3 28%, var(--surface));
   --chart-empty: color-mix(in srgb, var(--surface) 72%, var(--shadow-light));
   color-scheme: dark;
@@ -216,8 +224,30 @@ textarea:focus-visible {
   justify-content: space-between;
 }
 
+.site-header.auth-header {
+  background: var(--finance-header-bg);
+  border-color: var(--finance-border);
+}
+
+.site-header.auth-header .brand,
+.site-header.auth-header .button {
+  background: var(--finance-chip-bg);
+}
+
 .app-header {
   grid-template-columns: auto 1fr auto;
+}
+
+.site-header.app-header {
+  background: var(--finance-header-bg);
+  border-color: var(--finance-border);
+}
+
+.site-header.app-header .brand,
+.site-header.app-header .tab,
+.site-header.app-header .menu-toggle,
+.site-header.app-header .head-dropdown-toggle {
+  background: var(--finance-chip-bg);
 }
 
 .sticky {
@@ -293,6 +323,81 @@ textarea:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-xs);
+}
+
+.head-dropdown {
+  position: relative;
+}
+
+.head-dropdown-toggle {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--raised-shadow);
+  padding: 10px 9px;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.head-dropdown-toggle:hover {
+  box-shadow: var(--raised-shadow-hover);
+}
+
+.head-dropdown-toggle:active,
+.head-dropdown-toggle.open {
+  box-shadow: var(--inset-shadow);
+}
+
+.head-dropdown-toggle span {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--text-primary);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.head-dropdown-toggle.open span:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.head-dropdown-toggle.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.head-dropdown-toggle.open span:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
+.head-dropdown-panel {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: 0;
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 160px;
+  border: 1px solid var(--subtle-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--raised-shadow);
+  padding: var(--space-xs);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 5;
+}
+
+.head-dropdown-panel.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.head-dropdown-panel .button {
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .tab {
@@ -1037,6 +1142,44 @@ textarea::placeholder {
   align-items: start;
 }
 
+.profile-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profile-card-head,
+.recommend-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.profile-prediction-card {
+  gap: var(--space-xs);
+}
+
+.prediction-stats {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.prediction-stats span {
+  border: 1px solid var(--subtle-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--inset-shadow-soft);
+  color: var(--text-secondary);
+  display: grid;
+  gap: 3px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 9px 12px;
+}
+
+.prediction-stats strong {
+  font-size: 0.94rem;
+}
+
 .dynamic-profile-card,
 .leaderboard-panel,
 .profile-card,
@@ -1189,6 +1332,39 @@ textarea::placeholder {
 
 .recommend-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recommend-source {
+  grid-column: 1 / -1;
+}
+
+.platform-logo {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--subtle-border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--inset-shadow-soft);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+}
+
+.platform-logo img {
+  width: 26px;
+  height: 26px;
+}
+
+.platform-logo span {
+  color: var(--text-primary);
+  font-family: "Sora", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.recommend-card > .hustle-platform {
+  display: none;
 }
 
 .forum-reply {
