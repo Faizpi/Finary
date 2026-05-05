@@ -73,7 +73,15 @@ const badgeLevelByKey = {
 const today = new Date().toISOString().slice(0, 10)
 const currentMonth = new Date().toISOString().slice(0, 7)
 
-const pieColors = ['#ff9ba8', '#9ce9ff', '#b698ff', '#d7ff35', '#ffd8f0', '#a9f2c9', '#ffc48b']
+const pieColors = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+]
 
 const splitCsv = (value) =>
   value
@@ -98,6 +106,7 @@ function App() {
   const savedToken = localStorage.getItem('finary_token')
 
   const [language, setLanguage] = useState(() => localStorage.getItem('finary_lang') || 'id')
+  const [theme, setTheme] = useState(() => localStorage.getItem('finary_theme') || 'light')
   const [token, setToken] = useState(savedToken || '')
   const [user, setUser] = useState(null)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -176,6 +185,7 @@ function App() {
   const [forumReplyForms, setForumReplyForms] = useState({})
 
   const t = useCallback((idText, enText) => (language === 'en' ? enText : idText), [language])
+  const isDarkMode = theme === 'dark'
 
   const tabs = useMemo(
     () => [
@@ -227,7 +237,7 @@ function App() {
 
   const pieBackground = useMemo(() => {
     if (expenseSlices.total <= 0) {
-      return 'conic-gradient(#f0eef6 0% 100%)'
+      return 'conic-gradient(var(--chart-empty) 0% 100%)'
     }
 
     const gradient = expenseSlices.slices
@@ -400,6 +410,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('finary_lang', language)
   }, [language])
+
+  useEffect(() => {
+    localStorage.setItem('finary_theme', theme)
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   useEffect(() => {
     if (profilePhoto) {
@@ -841,9 +856,27 @@ function App() {
       <div className="page auth-page">
         <header className="site-header auth-header">
           <div className="brand">Finary</div>
-          <button className="button ghost" onClick={handleDemoLogin} disabled={loading}>
-            {loading ? t('Memuat...', 'Loading...') : t('Masuk Demo', 'Demo Login')}
-          </button>
+          <div className="head-actions">
+            <button
+              type="button"
+              className="button ghost tiny"
+              onClick={() => setLanguage((prev) => (prev === 'id' ? 'en' : 'id'))}
+              aria-label={t('Ganti bahasa', 'Switch language')}
+            >
+              {language === 'id' ? 'EN' : 'ID'}
+            </button>
+            <button
+              type="button"
+              className="button ghost tiny"
+              onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              aria-label={isDarkMode ? t('Aktifkan mode terang', 'Enable light mode') : t('Aktifkan mode gelap', 'Enable dark mode')}
+            >
+              {isDarkMode ? t('Light', 'Light') : t('Dark', 'Dark')}
+            </button>
+            <button className="button ghost" onClick={handleDemoLogin} disabled={loading}>
+              {loading ? t('Memuat...', 'Loading...') : t('Masuk Demo', 'Demo Login')}
+            </button>
+          </div>
         </header>
 
         <main className="auth-center">
@@ -1009,6 +1042,14 @@ function App() {
             aria-label={t('Ganti bahasa', 'Switch language')}
           >
             {language === 'id' ? 'EN' : 'ID'}
+          </button>
+          <button
+            type="button"
+            className="button ghost tiny"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            aria-label={isDarkMode ? t('Aktifkan mode terang', 'Enable light mode') : t('Aktifkan mode gelap', 'Enable dark mode')}
+          >
+            {isDarkMode ? t('Light', 'Light') : t('Dark', 'Dark')}
           </button>
           <button className="button ghost" onClick={handleLogout} disabled={loading}>
             {t('Logout', 'Logout')}
