@@ -140,6 +140,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isNavOpen, setIsNavOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [loading, setLoading] = useState(false)
   const [isBootstrapping, setIsBootstrapping] = useState(Boolean(savedToken))
@@ -889,28 +890,66 @@ function App() {
   if (!token || !user) {
     return (
       <div className="page auth-page">
-        <header className="site-header auth-header">
+        <header className="site-header sticky app-header">
           <div className="brand">Finary</div>
           <div className="head-actions">
-            <button
-              type="button"
-              className="button ghost tiny"
-              onClick={() => setLanguage((prev) => (prev === 'id' ? 'en' : 'id'))}
-              aria-label={t('Ganti bahasa', 'Switch language')}
-            >
-              {language === 'id' ? 'EN' : 'ID'}
-            </button>
-            <button
-              type="button"
-              className="button ghost tiny"
-              onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-              aria-label={isDarkMode ? t('Aktifkan mode terang', 'Enable light mode') : t('Aktifkan mode gelap', 'Enable dark mode')}
-            >
-              {isDarkMode ? t('Light', 'Light') : t('Dark', 'Dark')}
-            </button>
-            <button className="button ghost" onClick={handleDemoLogin} disabled={loading}>
-              {loading ? t('Memuat...', 'Loading...') : t('Masuk Demo', 'Demo Login')}
-            </button>
+            <div className="head-dropdown">
+              <button
+                type="button"
+                className={`head-dropdown-toggle ${isAuthMenuOpen ? 'open' : ''}`}
+                onClick={() => setIsAuthMenuOpen((prev) => !prev)}
+                aria-haspopup="menu"
+                aria-expanded={isAuthMenuOpen}
+                aria-controls="auth-menu-panel"
+                aria-label={t('Buka menu', 'Open menu')}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+              <div
+                id="auth-menu-panel"
+                className={`head-dropdown-panel ${isAuthMenuOpen ? 'open' : ''}`}
+                role="menu"
+              >
+                <button
+                  type="button"
+                  className="button ghost tiny"
+                  onClick={() => {
+                    setLanguage((prev) => (prev === 'id' ? 'en' : 'id'))
+                    setIsAuthMenuOpen(false)
+                  }}
+                  aria-label={t('Ganti bahasa', 'Switch language')}
+                  role="menuitem"
+                >
+                  {language === 'id' ? 'EN' : 'ID'}
+                </button>
+                <button
+                  type="button"
+                  className="button ghost tiny"
+                  onClick={() => {
+                    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+                    setIsAuthMenuOpen(false)
+                  }}
+                  aria-label={isDarkMode ? t('Aktifkan mode terang', 'Enable light mode') : t('Aktifkan mode gelap', 'Enable dark mode')}
+                  role="menuitem"
+                >
+                  {isDarkMode ? t('Light', 'Light') : t('Dark', 'Dark')}
+                </button>
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => {
+                    setIsAuthMenuOpen(false)
+                    handleDemoLogin()
+                  }}
+                  disabled={loading}
+                  role="menuitem"
+                >
+                  {loading ? t('Memuat...', 'Loading...') : t('Masuk Demo', 'Demo Login')}
+                </button>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -971,9 +1010,56 @@ function App() {
   if (showOnboarding) {
     return (
       <div className="page auth-page">
-        <header className="site-header auth-header">
+        <header className="site-header sticky app-header">
           <div className="brand">Finary</div>
-          <span className="onboarding-step">{t('Langkah 1 dari 1 — Asesmen Awal', 'Step 1 of 1 — Initial Assessment')}</span>
+          <div className="head-actions">
+            <span className="onboarding-step">{t('Langkah 1 dari 1 — Asesmen Awal', 'Step 1 of 1 — Initial Assessment')}</span>
+            <div className="head-dropdown">
+              <button
+                type="button"
+                className={`head-dropdown-toggle ${isAuthMenuOpen ? 'open' : ''}`}
+                onClick={() => setIsAuthMenuOpen((prev) => !prev)}
+                aria-haspopup="menu"
+                aria-expanded={isAuthMenuOpen}
+                aria-controls="onboarding-menu-panel"
+                aria-label={t('Buka menu', 'Open menu')}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+              <div
+                id="onboarding-menu-panel"
+                className={`head-dropdown-panel ${isAuthMenuOpen ? 'open' : ''}`}
+                role="menu"
+              >
+                <button
+                  type="button"
+                  className="button ghost tiny"
+                  onClick={() => {
+                    setLanguage((prev) => (prev === 'id' ? 'en' : 'id'))
+                    setIsAuthMenuOpen(false)
+                  }}
+                  aria-label={t('Ganti bahasa', 'Switch language')}
+                  role="menuitem"
+                >
+                  {language === 'id' ? 'EN' : 'ID'}
+                </button>
+                <button
+                  type="button"
+                  className="button ghost tiny"
+                  onClick={() => {
+                    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+                    setIsAuthMenuOpen(false)
+                  }}
+                  aria-label={isDarkMode ? t('Aktifkan mode terang', 'Enable light mode') : t('Aktifkan mode gelap', 'Enable dark mode')}
+                  role="menuitem"
+                >
+                  {isDarkMode ? t('Light', 'Light') : t('Dark', 'Dark')}
+                </button>
+              </div>
+            </div>
+          </div>
         </header>
         <main className="auth-center">
           <div className="auth-box onboarding-box">
