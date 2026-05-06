@@ -588,11 +588,12 @@ button:disabled {
   border: 1px solid var(--subtle-border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--raised-shadow);
+  box-shadow: none;
 }
 
 .panel {
   padding: var(--space-md);
+  box-shadow: var(--raised-shadow);
 }
 
 .panel-pop {
@@ -872,7 +873,7 @@ textarea::placeholder {
   border: 1px solid var(--subtle-border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--inset-shadow);
+  box-shadow: none;
 }
 
 .inset {
@@ -1254,7 +1255,7 @@ textarea::placeholder {
   border: 1px solid var(--subtle-border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--raised-shadow);
+  box-shadow: none;
   display: grid;
   gap: var(--space-xs);
   padding: var(--space-sm);
@@ -1338,6 +1339,8 @@ textarea::placeholder {
 .leaderboard {
   list-style: none;
   padding: 0;
+  display: grid;
+  gap: 10px;
   align-content: start;
 }
 
@@ -1346,7 +1349,9 @@ textarea::placeholder {
   justify-content: space-between;
   align-items: center;
   gap: var(--space-xs);
+  margin: 0;
   padding: var(--space-xs);
+  box-shadow: var(--raised-shadow);
 }
 
 .hustle-hero {
