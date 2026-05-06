@@ -1041,8 +1041,8 @@ function App() {
         ))}
       </datalist>
 
-      <header className="site-header sticky app-header">
-        <div className="brand">Finary</div>
+        <header className="site-header sticky app-header">
+          <div className="brand">Finary</div>
         <button
           type="button"
           className={`menu-toggle ${isNavOpen ? 'open' : ''}`}
@@ -1070,7 +1070,7 @@ function App() {
           ))}
         </nav>
         <div className="head-actions">
-          <span>{t('Halo', 'Hi')}, {user.name}</span>
+          <span className="head-greeting">{t('Halo', 'Hi')}, {user.name}</span>
           <div className="head-dropdown">
             <button
               type="button"
