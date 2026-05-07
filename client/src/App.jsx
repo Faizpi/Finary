@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import finaryImg from './assets/finary.png'
 import api, {
   assessmentApi,
   authApi,
@@ -10,6 +9,13 @@ import api, {
   transactionApi,
 } from './lib/api'
 import { compactDate, currency } from './lib/format'
+import faqImg from './assets/faq.png'
+import forumImg from './assets/forum.png'
+import haloImg from './assets/halo.png'
+import heroImg from './assets/hero.png'
+import hustleImg from './assets/hustle.png'
+import shockImg from './assets/shock.png'
+import shyImg from './assets/shy.png'
 
 const categoryOptions = [
   'Makanan',
@@ -58,6 +64,16 @@ const interestCategoryOptions = [
 const defaultBadgeIcon = 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3c5.svg'
 
 const maxBadgeLevel = 6
+
+const visualAssets = {
+  auth: haloImg,
+  onboarding: heroImg,
+  dashboard: shyImg,
+  assessment: shockImg,
+  forum: forumImg,
+  faq: faqImg,
+  hustle: hustleImg,
+}
 
 const badgeLevelByKey = {
   first_saver: 6,
@@ -955,10 +971,10 @@ function App() {
 
         <main className="auth-center">
           <div className="auth-box">
-            <div className="auth-brand-block auth-brand-image">
-              <img src={finaryImg} alt="Finary" className="auth-finary-img" />
+            <div className="auth-brand-block auth-brand-image login-hero">
+              <img src={visualAssets.auth} alt="Finary" className="auth-hero-img" />
               <h1>Finary</h1>
-              <p>{t('Kelola keuanganmu dengan cerdas — didukung AI.', 'Manage your finances smartly — powered by AI.')}</p>
+              <p>{t('Kelola uang seperti naik level setiap hari: jelas, ringan, dan didukung AI.', 'Manage money like leveling up every day: clear, friendly, and powered by AI.')}</p>
             </div>
 
             <div className="panel auth-form-panel">
@@ -1000,6 +1016,70 @@ function App() {
             </div>
           </div>
         </main>
+
+        <section className="marketing-section product-section" aria-label={t('Produk Finary', 'Finary products')}>
+          <div className="section-head marketing-head">
+            <div>
+              <p className="kicker">{t('Produk', 'Products')}</p>
+              <h2>{t('Semua misi uangmu dalam satu tempat', 'Every money mission in one place')}</h2>
+            </div>
+            <p className="helper">{t('Dashboard, budget, investasi, dan AI coaching dibuat terasa ringan seperti game harian.', 'Dashboards, budgets, investments, and AI coaching made as light as a daily game.')}</p>
+          </div>
+          <div className="marketing-grid">
+            <article className="product-card coin">
+              <span className="product-icon">Rp</span>
+              <h3>{t('Budget Quest', 'Budget Quest')}</h3>
+              <p>{t('Atur kantong, pantau batas, dan dapatkan umpan balik visual sebelum pengeluaran lewat target.', 'Set pockets, track limits, and get visual feedback before spending crosses the target.')}</p>
+              <div className="mini-progress"><span style={{ width: '72%' }} /></div>
+            </article>
+            <article className="product-card chart">
+              <span className="product-icon">AI</span>
+              <h3>{t('Insight Coach', 'Insight Coach')}</h3>
+              <p>{t('AI mengubah data transaksi menjadi saran sederhana, motivasi, dan tanda risiko yang mudah dipahami.', 'AI turns transaction data into simple guidance, motivation, and easy-to-read risk signals.')}</p>
+              <div className="reward-row"><span>Smart</span><span>+18%</span></div>
+            </article>
+            <article className="product-card badge">
+              <span className="product-icon">Lv</span>
+              <h3>{t('Wealth Streak', 'Wealth Streak')}</h3>
+              <p>{t('Badge, streak, dan leaderboard menjaga kebiasaan menabung terasa menyenangkan tanpa mengurangi kredibilitas.', 'Badges, streaks, and leaderboards keep saving habits fun without losing credibility.')}</p>
+              <div className="badge-level-track">
+                <span className="badge-level-dot on" />
+                <span className="badge-level-dot on" />
+                <span className="badge-level-dot on" />
+                <span className="badge-level-dot" />
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="marketing-section social-section" aria-label={t('Testimoni dan FAQ', 'Testimonials and FAQ')}>
+          <div className="testimonial-card">
+            <p className="kicker">{t('Cerita Pengguna', 'User Story')}</p>
+            <img
+              className="faq-illustration"
+              src={visualAssets.faq}
+              alt={t('Ilustrasi FAQ', 'FAQ illustration')}
+              loading="lazy"
+            />
+            <h2>{t('Budgeting akhirnya terasa ringan.', 'Budgeting finally feels light.')}</h2>
+            <p>{t('Finary membuat target tabungan, cicilan, dan pengeluaran harian terasa jelas karena setiap aksi punya feedback langsung.', 'Finary makes savings goals, installments, and daily spending clear because every action gets instant feedback.')}</p>
+            <strong>Rani, freelancer</strong>
+          </div>
+          <div className="faq-list">
+            <article>
+              <h3>{t('Apakah cocok untuk pemula?', 'Is it beginner friendly?')}</h3>
+              <p>{t('Ya. Alurnya dibuat bertahap dengan cue onboarding, progres, dan bahasa yang mudah dipahami.', 'Yes. The flow is gradual with onboarding cues, progress, and plain language.')}</p>
+            </article>
+            <article>
+              <h3>{t('Apakah dark mode tersedia?', 'Is dark mode available?')}</h3>
+              <p>{t('Tersedia. Warna, kartu, dan grafik tetap kontras di mode gelap.', 'Yes. Colors, cards, and charts stay high contrast in dark mode.')}</p>
+            </article>
+            <article>
+              <h3>{t('Apa data saya terlihat aman?', 'Will my data feel secure?')}</h3>
+              <p>{t('UI menonjolkan status, ringkasan, dan aksi penting secara jelas agar keputusan finansial tetap percaya diri.', 'The UI highlights status, summaries, and important actions clearly so financial decisions stay confident.')}</p>
+            </article>
+          </div>
+        </section>
 
         <footer className="credits">by Tim Capstone CC26-PSU008</footer>
       </div>
@@ -1064,7 +1144,7 @@ function App() {
         <main className="auth-center">
           <div className="auth-box onboarding-box">
             <div className="auth-brand-block auth-brand-image">
-              <img src={finaryImg} alt="Finary" className="auth-finary-img" />
+              <img src={visualAssets.onboarding} alt="Finary" className="auth-finary-img" />
               <h1>{t('Asesmen Finansial', 'Financial Assessment')}</h1>
               <p>{t('Isi data keuanganmu agar AI bisa mengklasifikasikan kondisi finansialmu secara akurat.', 'Fill in your financial data so AI can classify your condition accurately.')}</p>
             </div>
@@ -1276,6 +1356,13 @@ function App() {
                   <span>{transactions.length} {t('transaksi', 'transactions')}</span>
                   <span>{budgets.length} {t('kantong aktif', 'active pockets')}</span>
                 </div>
+              </div>
+              <div className="balance-art">
+                <img
+                  src={visualAssets.dashboard}
+                  alt={t('Ilustrasi dashboard', 'Dashboard illustration')}
+                  loading="lazy"
+                />
               </div>
             </section>
 
@@ -1900,6 +1987,12 @@ function App() {
               </form>
 
               <article className="inset assessment-preview">
+                <img
+                  className="assessment-illustration"
+                  src={visualAssets.assessment}
+                  alt={t('Ilustrasi assessment', 'Assessment illustration')}
+                  loading="lazy"
+                />
                 <h3>{t('Hasil Klasifikasi AI', 'AI Classification Result')}</h3>
                 {mlClassifyResult ? (
                   <>
@@ -1972,6 +2065,13 @@ function App() {
                   {mlLoading ? t('🤖 Mencari...', '🤖 Searching...') : t('🤖 Cari Rekomendasi AI', '🤖 Get AI Recommendations')}
                 </button>
               </form>
+              <div className="hustle-hero-media">
+                <img
+                  src={visualAssets.hustle}
+                  alt={t('Ilustrasi side hustle', 'Side hustle illustration')}
+                  loading="lazy"
+                />
+              </div>
             </article>
 
             <div className="recommend-grid">
@@ -2051,6 +2151,12 @@ function App() {
 
               <article className="inset forum-info">
                 <h3>{t('Komunitas Finary', 'Finary Community')}</h3>
+                <img
+                  className="forum-illustration"
+                  src={visualAssets.forum}
+                  alt={t('Ilustrasi forum', 'Forum illustration')}
+                  loading="lazy"
+                />
                 <p className="helper">{t('Diskusi, tanya, dan berbagi tips keuangan bersama pengguna lain.', 'Discuss, ask, and share financial tips with others.')}</p>
               </article>
             </div>
